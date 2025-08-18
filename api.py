@@ -6,7 +6,7 @@ import sys
 if "" in sys.path:
     sys.path.remove("")
     sys.path.append("")
-
+import fastapi
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse, StreamingResponse
 import resolve
