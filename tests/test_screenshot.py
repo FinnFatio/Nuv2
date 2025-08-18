@@ -35,3 +35,13 @@ def test_capture_around_near_bottom_right(monkeypatch):
     img, region = screenshot.capture_around(point, width=100, height=100)
     assert region == (740, 540, 800, 600)
     assert img == region
+
+
+def test_capture_around_within_bounds(monkeypatch):
+    monkeypatch.setattr(screenshot, "get_screen_resolution", lambda: (800, 600))
+    monkeypatch.setattr(screenshot, "capture", stub_capture)
+    point = {"x": 400, "y": 300}
+    bounds = {"left": 380, "top": 290, "right": 420, "bottom": 310}
+    img, region = screenshot.capture_around(point, width=100, height=100, bounds=bounds)
+    assert region == (380, 290, 420, 310)
+    assert img == region

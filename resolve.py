@@ -12,13 +12,21 @@ UIA_THRESHOLD = 0.7
 def describe_under_cursor() -> Dict:
     pos = get_position()
     app, element, uia_text, uia_conf = get_element_info(pos["x"], pos["y"])
-    img, _ = capture_around(pos)
+    bounds = element.get("bounds") if isinstance(element, dict) else None
+    img, _ = capture_around(pos, bounds=bounds)
     ocr_text, ocr_conf = extract_text(img)
-    chosen = uia_text if uia_conf >= UIA_THRESHOLD else ocr_text
+    visible = element.get("is_offscreen") is False if isinstance(element, dict) else False
+    if uia_conf >= UIA_THRESHOLD and visible:
+        chosen = uia_text
+        source = "uia"
+    else:
+        chosen = ocr_text
+        source = "ocr"
     return {
         "cursor": pos,
         "app": app,
         "element": element,
         "text": {"uia": uia_text, "ocr": ocr_text, "chosen": chosen},
         "confidence": {"uia": uia_conf, "ocr": ocr_conf},
+        "source": source,
     }
