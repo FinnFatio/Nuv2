@@ -3,10 +3,12 @@ from cursor import get_position
 from screenshot import capture_around
 from uia import get_element_info
 from ocr import extract_text
+from logger import log_call
 
 UIA_THRESHOLD = 0.7
 
 
+@log_call
 def describe_under_cursor() -> Dict:
     pos = get_position()
     app, element, uia_text, uia_conf = get_element_info(pos["x"], pos["y"])

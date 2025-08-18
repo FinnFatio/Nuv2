@@ -3,6 +3,7 @@ from PIL import Image
 import pytesseract
 import os
 import configparser
+from logger import log_call
 
 
 try:
@@ -17,6 +18,7 @@ except Exception:
     pass
 
 
+@log_call
 def extract_text(image: Image) -> Tuple[str, float]:
     """Run OCR on the given image, returning text and confidence."""
     try:
