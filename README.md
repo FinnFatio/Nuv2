@@ -17,6 +17,18 @@ Proof-of-concept utilities to inspect what is under the mouse cursor on Windows.
 
 - `mss` for screen capturing.
 
+## Configuration
+
+Options can be provided via environment variables, a `.env` file or a
+`config.json` file in the project directory. Environment variables have
+precedence over `.env`, which in turn override `config.json`.
+
+- `OCR_LANG` – languages for Tesseract (default: `por+eng`)
+- `OCR_CFG` – extra Tesseract config string (default: `--oem 3 --psm 6`)
+- `CAPTURE_WIDTH` – width of the screenshot region (default: `300`)
+- `CAPTURE_HEIGHT` – height of the screenshot region (default: `120`)
+- `UIA_THRESHOLD` – confidence threshold for preferring UIA text (default: `0.7`)
+
 ## Usage
 
 ```sh

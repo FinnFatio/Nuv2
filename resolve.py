@@ -8,8 +8,7 @@ from screenshot import capture_around
 from uia import get_element_info
 from ocr import extract_text
 from logger import log_call, log
-
-UIA_THRESHOLD = 0.7
+from settings import UIA_THRESHOLD
 
 
 # Runtime salt used for stable ID generation

@@ -4,6 +4,7 @@ from PIL import Image
 import argparse
 import re
 from pathlib import Path
+from settings import CAPTURE_WIDTH, CAPTURE_HEIGHT
 
 
 def get_screen_resolution() -> Tuple[int, int]:
@@ -32,8 +33,8 @@ def capture(region: Tuple[int, int, int, int] = None) -> Image:
 
 def capture_around(
     point: Dict[str, int],
-    width: int = 300,
-    height: int = 120,
+    width: int = CAPTURE_WIDTH,
+    height: int = CAPTURE_HEIGHT,
     bounds: Optional[Dict[str, int]] = None,
 ) -> Tuple[Image, Tuple[int, int, int, int]]:
     """Capture a screenshot centered on the given point.
