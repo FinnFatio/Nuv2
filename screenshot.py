@@ -1,4 +1,4 @@
-from typing import Tuple, Dict
+from typing import Tuple, Dict, Optional
 import mss
 from PIL import Image
 
@@ -27,12 +27,28 @@ def capture(region: Tuple[int, int, int, int] = None) -> Image:
         return Image.frombytes("RGB", screenshot.size, screenshot.rgb)
 
 
-def capture_around(point: Dict[str, int], width: int = 300, height: int = 120) -> Tuple[Image, Tuple[int, int, int, int]]:
-    """Capture a screenshot centered on the given point."""
+def capture_around(
+    point: Dict[str, int],
+    width: int = 300,
+    height: int = 120,
+    bounds: Optional[Dict[str, int]] = None,
+) -> Tuple[Image, Tuple[int, int, int, int]]:
+    """Capture a screenshot centered on the given point.
+
+    If ``bounds`` is provided, the captured region will be clipped to lie
+    within those bounds.
+    """
     left = point["x"] - width // 2
     top = point["y"] - height // 2
     right = left + width
     bottom = top + height
+
+    if bounds:
+        left = max(bounds.get("left", left), left)
+        top = max(bounds.get("top", top), top)
+        right = min(bounds.get("right", right), right)
+        bottom = min(bounds.get("bottom", bottom), bottom)
+
     screen_width, screen_height = get_screen_resolution()
     left = max(0, left)
     top = max(0, top)
