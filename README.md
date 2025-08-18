@@ -11,7 +11,7 @@ Proof-of-concept utilities to inspect what is under the mouse cursor on Windows.
 - `resolve.py`: combine UIA and OCR with confidence heuristics.
 - `what_is_under_mouse.py`: simple CLI outputting JSON description.
 - `hover_watch.py`: repeatedly describe what's under the cursor.
-- `inspect.py`: describe a given point without moving the cursor.
+- `inspect_point.py`: describe a given point without moving the cursor.
 
 ## Dependencies
 
@@ -53,5 +53,21 @@ python screenshot.py --region 0,0,800,600 example.png
 Inspect a specific point:
 
 ```sh
-python inspect.py --point 100,200
+python inspect_point.py --point 100,200
 ```
+
+## API
+
+Run a small HTTP API with FastAPI:
+
+```sh
+uvicorn api:app --port 8000
+```
+
+Endpoints:
+
+- `GET /inspect?x=&y=` – JSON from `describe_under_cursor`.
+- `GET /details?id=` – cached element details and supported patterns.
+- `GET /snapshot?id=ID` or `GET /snapshot?region=x,y,w,h` – PNG image.
+
+Responses and logs follow the same JSON structure as the CLI tools.

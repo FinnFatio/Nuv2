@@ -1,6 +1,7 @@
 import json
 import logging
 import time
+from functools import wraps
 
 ENABLED = False
 
@@ -23,6 +24,7 @@ def log(stage: str, start: float, error: str | None = None) -> None:
 
 def log_call(func):
     """Decorator to log function start, end and errors."""
+    @wraps(func)
     def wrapper(*args, **kwargs):
         start = time.time()
         log(f"{func.__name__}.start", start)
