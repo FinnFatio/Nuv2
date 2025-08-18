@@ -4,6 +4,7 @@ import pytesseract
 import os
 import configparser
 from logger import log_call
+from settings import OCR_LANG, OCR_CFG
 
 
 try:
@@ -25,8 +26,8 @@ def extract_text(image: Image) -> Tuple[str, float]:
         data = pytesseract.image_to_data(
             image,
             output_type=pytesseract.Output.DICT,
-            lang="por+eng",
-            config="--oem 3 --psm 6",
+            lang=OCR_LANG,
+            config=OCR_CFG,
         )
     except FileNotFoundError as e:
         raise RuntimeError(
