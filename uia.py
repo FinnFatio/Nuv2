@@ -1,8 +1,10 @@
 from typing import Dict, Tuple
 import psutil
 from pywinauto.uia_element_info import UIAElementInfo
+from logger import log_call
 
 
+@log_call
 def get_element_info(x: int, y: int) -> Tuple[Dict, Dict, str, float]:
     """Return app info, element info, text and confidence for position."""
     try:
