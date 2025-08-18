@@ -30,6 +30,12 @@ def test_describe_prefers_uia_when_visible(monkeypatch):
     result = resolve.describe_under_cursor()
     assert result["text"]["chosen"] == "uia_text"
     assert result["source"] == "uia"
+    # timings and errors
+    for step in ["get_position", "get_element_info", "capture_around", "extract_text"]:
+        assert step in result["timings"]
+        t = result["timings"][step]
+        assert t["start"] <= t["end"]
+    assert result["errors"] == {}
 
 
 def test_describe_prefers_ocr_when_offscreen(monkeypatch):
@@ -71,3 +77,18 @@ def test_ids_and_cache(monkeypatch):
     assert result["control_id"] == expected_control_id
     assert resolve.ID_CACHE["last_window_id"] == expected_window_id
     assert resolve.ID_CACHE["last_editable_control_id"] == expected_control_id
+
+
+def test_error_capture(monkeypatch):
+    monkeypatch.setattr(resolve, "get_position", lambda: {"x": 10, "y": 10})
+    app = {}
+    element = {"bounds": {"left": 0, "top": 0, "right": 100, "bottom": 100}, "is_offscreen": False}
+    monkeypatch.setattr(resolve, "get_element_info", lambda x, y: (app, element, "uia_text", 0.9))
+    monkeypatch.setattr(resolve, "capture_around", lambda pos, bounds=None: ("img", (0, 0, 0, 0)))
+
+    def boom(img):
+        raise ValueError("fail")
+
+    monkeypatch.setattr(resolve, "extract_text", boom)
+    result = resolve.describe_under_cursor()
+    assert "extract_text" in result["errors"]
