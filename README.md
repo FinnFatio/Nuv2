@@ -15,7 +15,20 @@ Utilitários de prova de conceito para inspecionar o que está sob o cursor do m
 
 ## Dependências
 
+As bibliotecas necessárias estão listadas em `requirements.txt`. Instale-as com:
+
+```sh
+pip install -r requirements.txt
+```
+
+Principais dependências:
+
 - `mss` para captura de tela.
+- `Pillow` para manipulação de imagens.
+- `pytesseract` para OCR.
+- `psutil` para informações de processos.
+- `fastapi` para o servidor HTTP.
+- `pygetwindow` (opcional) para manipulação de janelas.
 
 ## Configuração
 
