@@ -1,12 +1,13 @@
 from typing import Dict, Tuple
 import hashlib
 import secrets
+import time
 
 from cursor import get_position
 from screenshot import capture_around
 from uia import get_element_info
 from ocr import extract_text
-from logger import log_call
+from logger import log_call, log
 
 UIA_THRESHOLD = 0.7
 
@@ -47,11 +48,63 @@ def _compute_ids(app: Dict, element: Dict) -> Tuple[str, str]:
 
 @log_call
 def describe_under_cursor() -> Dict:
-    pos = get_position()
-    app, element, uia_text, uia_conf = get_element_info(pos["x"], pos["y"])
+    timings: Dict[str, Dict[str, float]] = {}
+    errors: Dict[str, str] = {}
+
+    # get_position
+    start = time.time()
+    log("get_position.start", start)
+    try:
+        pos = get_position()
+        log("get_position.end", start)
+    except Exception as e:  # pragma: no cover - defensive
+        log("get_position.error", start, error=str(e))
+        errors["get_position"] = str(e)
+        pos = {"x": 0, "y": 0}
+    timings["get_position"] = {"start": start, "end": time.time()}
+
+    # get_element_info
+    start = time.time()
+    log("get_element_info.start", start)
+    try:
+        app, element, uia_text, uia_conf = get_element_info(pos["x"], pos["y"])
+        log("get_element_info.end", start)
+    except Exception as e:  # pragma: no cover - defensive
+        log("get_element_info.error", start, error=str(e))
+        errors["get_element_info"] = str(e)
+        app, element, uia_text, uia_conf = {}, {}, "", 0.0
+    timings["get_element_info"] = {"start": start, "end": time.time()}
+
+    # capture_around
+    start = time.time()
+    log("capture_around.start", start)
     bounds = element.get("bounds") if isinstance(element, dict) else None
-    img, _ = capture_around(pos, bounds=bounds)
-    ocr_text, ocr_conf = extract_text(img)
+    try:
+        img, _ = capture_around(pos, bounds=bounds)
+        log("capture_around.end", start)
+    except Exception as e:  # pragma: no cover - defensive
+        log("capture_around.error", start, error=str(e))
+        errors["capture_around"] = str(e)
+        img = None
+    timings["capture_around"] = {"start": start, "end": time.time()}
+
+    # extract_text
+    start = time.time()
+    log("extract_text.start", start)
+    if img is not None:
+        try:
+            ocr_text, ocr_conf = extract_text(img)
+            log("extract_text.end", start)
+        except Exception as e:  # pragma: no cover - defensive
+            log("extract_text.error", start, error=str(e))
+            errors["extract_text"] = str(e)
+            ocr_text, ocr_conf = "", 0.0
+    else:
+        log("extract_text.error", start, error="missing image")
+        errors["extract_text"] = "missing image"
+        ocr_text, ocr_conf = "", 0.0
+    timings["extract_text"] = {"start": start, "end": time.time()}
+
     visible = element.get("is_offscreen") is False if isinstance(element, dict) else False
     window_id, control_id = _compute_ids(app, element)
     app["window_id"] = window_id
@@ -74,4 +127,6 @@ def describe_under_cursor() -> Dict:
         "source": source,
         "window_id": window_id,
         "control_id": control_id,
+        "timings": timings,
+        "errors": errors,
     }
