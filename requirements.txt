@@ -1,0 +1,6 @@
+fastapi
+mss
+Pillow
+pytesseract
+psutil
+pygetwindow  # optional
