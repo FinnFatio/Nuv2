@@ -46,21 +46,24 @@ def _compute_ids(app: Dict, element: Dict) -> Tuple[str, str]:
 
 
 @log_call
-def describe_under_cursor() -> Dict:
+def describe_under_cursor(x: int | None = None, y: int | None = None) -> Dict:
     timings: Dict[str, Dict[str, float]] = {}
     errors: Dict[str, str] = {}
 
-    # get_position
-    start = time.time()
-    log("get_position.start", start)
-    try:
-        pos = get_position()
-        log("get_position.end", start)
-    except Exception as e:  # pragma: no cover - defensive
-        log("get_position.error", start, error=str(e))
-        errors["get_position"] = str(e)
-        pos = {"x": 0, "y": 0}
-    timings["get_position"] = {"start": start, "end": time.time()}
+    if x is not None and y is not None:
+        pos = {"x": x, "y": y}
+    else:
+        # get_position
+        start = time.time()
+        log("get_position.start", start)
+        try:
+            pos = get_position()
+            log("get_position.end", start)
+        except Exception as e:  # pragma: no cover - defensive
+            log("get_position.error", start, error=str(e))
+            errors["get_position"] = str(e)
+            pos = {"x": 0, "y": 0}
+        timings["get_position"] = {"start": start, "end": time.time()}
 
     # get_element_info
     start = time.time()

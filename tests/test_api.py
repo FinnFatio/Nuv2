@@ -18,7 +18,7 @@ from fastapi.testclient import TestClient
 import api
 
 
-def fake_describe_under_cursor():
+def fake_describe_under_cursor(x=None, y=None):
     return {
         "cursor": {"x": 1, "y": 2},
         "app": {},
@@ -70,4 +70,21 @@ def test_api_routes(monkeypatch):
     resp = client.get("/snapshot", params={"id": "c1"})
     assert resp.status_code == 200
     assert resp.headers["content-type"] == "image/png"
+
+
+def test_inspect_with_coordinates(monkeypatch):
+    recorded = {}
+
+    def fake_desc(x=None, y=None):
+        recorded["coords"] = (x, y)
+        return fake_describe_under_cursor(x, y)
+
+    api.ELEMENT_CACHE.clear()
+    api.BOUNDS_CACHE.clear()
+    monkeypatch.setattr(api.resolve, "describe_under_cursor", fake_desc)
+    client = TestClient(api.app)
+
+    resp = client.get("/inspect", params={"x": 5, "y": 6})
+    assert resp.status_code == 200
+    assert recorded["coords"] == (5, 6)
 
