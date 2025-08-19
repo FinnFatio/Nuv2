@@ -3,6 +3,10 @@
 Este roadmap organiza as entregas em quatro marcos (M0–M3) com tarefas acionáveis, critérios de pronto (DoD) e dependências. Use este arquivo como issue tracker inicial e referência para milestones do GitHub.
 
 Sempre que terminar um minor-milestone, colocar " X " dentro do " [ ] "
+
+## Objetivo
+
+Nu é ser uma IA capaz de abrir, fechar, alterar, deletar, criar arquivos e programas. Usando LLM e sendo capaz de ver a tela para alcançar os objetivos. E para isso, existe os milestones.
 ---
 
 ## Milestone M0 — Visor confiável (higiene básica)
