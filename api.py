@@ -28,10 +28,7 @@ BOUNDS_CACHE: Dict[str, Dict] = {}
 def inspect(x: int | None = Query(default=None), y: int | None = Query(default=None)):
     """Describe the element under the cursor or at provided coordinates."""
     if x is not None and y is not None:
-        original = resolve.get_position
-        resolve.get_position = lambda: {"x": x, "y": y}
-        info = resolve.describe_under_cursor()
-        resolve.get_position = original
+        info = resolve.describe_under_cursor(x, y)
     else:
         info = resolve.describe_under_cursor()
     element = info.get("element", {})
