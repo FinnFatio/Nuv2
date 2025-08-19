@@ -5,8 +5,16 @@ Este roadmap organiza as entregas em quatro marcos (M0–M3) com tarefas acioná
 Sempre que terminar um minor-milestone, colocar " X " dentro do " [ ] "
 
 ## Objetivo
+A **Nu** é uma IA pessoal capaz de interagir com programas e arquivos de forma autônoma e segura.  
+Seu propósito final é **abrir, fechar, criar, alterar e excluir arquivos e aplicações**, entendendo a tela como um humano faria, com apoio de um LLM para planejar e decidir ações.  
 
-Nu é ser uma IA capaz de abrir, fechar, alterar, deletar, criar arquivos e programas. Usando LLM e sendo capaz de ver a tela para alcançar os objetivos. E para isso, existe os milestones.
+Ela combina:
+- **Visão da interface** (UI Automation + OCR) para enxergar e interpretar a tela.
+- **Vocabulário de ações canônicas** (open_app, set_text, click, invoke, etc.) para agir de forma estável.
+- **Conversação natural** para receber instruções humanas e discutir planos.
+- **Pesquisa integrada** para apoiar decisões e resolver problemas.
+
+Os milestones M0–M3 representam a fundação: um **visor confiável**, enriquecimento de **metadados**, criação de **CLIs utilitários** e a exposição de um **runtime HTTP** para conectar a visão à inteligência do LLM.  
 ---
 
 ## Milestone M0 — Visor confiável (higiene básica)
