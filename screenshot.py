@@ -1,6 +1,7 @@
 from typing import Tuple, Dict, Optional
 import mss
 from PIL import Image
+from PIL.Image import Image as PILImage  # classe para tipagem
 import argparse
 import re
 from pathlib import Path
@@ -36,7 +37,7 @@ def capture_around(
     width: int = CAPTURE_WIDTH,
     height: int = CAPTURE_HEIGHT,
     bounds: Optional[Dict[str, int]] = None,
-) -> Tuple[Image, Tuple[int, int, int, int]]:
+) -> Tuple[PILImage, Tuple[int, int, int, int]]:
     """Capture a screenshot centered on the given point.
 
     If ``bounds`` is provided, the captured region will be clipped to lie
