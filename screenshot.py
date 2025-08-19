@@ -1,4 +1,8 @@
 from typing import Tuple, Dict, Optional
+
+import json
+import time
+
 import mss
 from PIL import Image
 from PIL.Image import Image as PILImage  # classe para tipagem
@@ -7,16 +11,40 @@ import re
 from pathlib import Path
 from settings import CAPTURE_WIDTH, CAPTURE_HEIGHT
 
+_SCT = None
+
+
+def _reset_sct() -> None:
+    global _SCT
+    try:  # pragma: no cover - best effort cleanup
+        if _SCT is not None:
+            _SCT.close()
+    except Exception:
+        pass
+    _SCT = None
+
+
+def _get_sct() -> "mss.mss":
+    global _SCT
+    if _SCT is None:
+        _SCT = mss.mss()
+    return _SCT
+
 
 def get_screen_bounds() -> Tuple[int, int, int, int]:
     """Return the bounding box of all monitors as (left, top, right, bottom)."""
-    with mss.mss() as sct:
+    sct = _get_sct()
+    try:
         monitor = sct.monitors[0]
-        left = monitor["left"]
-        top = monitor["top"]
-        right = left + monitor["width"]
-        bottom = top + monitor["height"]
-        return left, top, right, bottom
+    except Exception:
+        _reset_sct()
+        sct = _get_sct()
+        monitor = sct.monitors[0]
+    left = monitor["left"]
+    top = monitor["top"]
+    right = left + monitor["width"]
+    bottom = top + monitor["height"]
+    return left, top, right, bottom
 
 
 def get_screen_resolution() -> Tuple[int, int]:
@@ -27,19 +55,56 @@ def get_screen_resolution() -> Tuple[int, int]:
 
 def capture(region: Tuple[int, int, int, int] = None) -> Image:
     """Capture a screenshot of the given region."""
-    with mss.mss() as sct:
-        if region:
-            left, top, right, bottom = region
-            monitor = {
-                "left": left,
-                "top": top,
-                "width": right - left,
-                "height": bottom - top,
-            }
-        else:
+    sct = _get_sct()
+    if region:
+        left, top, right, bottom = region
+        monitor = {
+            "left": left,
+            "top": top,
+            "width": right - left,
+            "height": bottom - top,
+        }
+    else:
+        try:
             monitor = sct.monitors[0]
+        except Exception:
+            _reset_sct()
+            sct = _get_sct()
+            monitor = sct.monitors[0]
+    start = time.perf_counter()
+    try:
         screenshot = sct.grab(monitor)
-        return Image.frombytes("RGB", screenshot.size, screenshot.rgb)
+    except Exception:
+        _reset_sct()
+        sct = _get_sct()
+        screenshot = sct.grab(monitor)
+    elapsed_ms = int((time.perf_counter() - start) * 1000)
+    print(json.dumps({"time_capture_ms": elapsed_ms}))
+    return Image.frombytes("RGB", screenshot.size, screenshot.rgb)
+
+
+def get_monitor_bounds_for_point(x: int, y: int) -> Dict[str, int]:
+    """Return monitor bounds containing point (x, y) or virtual screen."""
+    sct = _get_sct()
+    try:
+        monitors = sct.monitors
+    except Exception:
+        _reset_sct()
+        sct = _get_sct()
+        monitors = sct.monitors
+    for mon in monitors[1:]:
+        left = mon["left"]
+        top = mon["top"]
+        right = left + mon["width"]
+        bottom = top + mon["height"]
+        if left <= x < right and top <= y < bottom:
+            return {"left": left, "top": top, "right": right, "bottom": bottom}
+    mon = monitors[0]
+    left = mon["left"]
+    top = mon["top"]
+    right = left + mon["width"]
+    bottom = top + mon["height"]
+    return {"left": left, "top": top, "right": right, "bottom": bottom}
 
 
 def capture_around(
@@ -57,6 +122,9 @@ def capture_around(
     top = point["y"] - height // 2
     right = left + width
     bottom = top + height
+
+    if bounds is None:
+        bounds = get_monitor_bounds_for_point(point["x"], point["y"])
 
     if bounds:
         left = max(bounds.get("left", left), left)
