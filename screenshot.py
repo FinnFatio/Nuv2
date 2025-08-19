@@ -1,4 +1,7 @@
 from typing import Tuple, Dict, Optional
+import json
+import time
+
 import mss
 from PIL import Image
 from PIL.Image import Image as PILImage  # classe para tipagem
@@ -8,28 +11,80 @@ from pathlib import Path
 from settings import CAPTURE_WIDTH, CAPTURE_HEIGHT
 
 
+_SCT = None
+
+
+def _get_sct():
+    """Return a cached ``mss`` instance, recreating it if needed."""
+    global _SCT
+    if _SCT is None:
+        _SCT = mss.mss()
+    return _SCT
+
+
+def get_screen_bounds() -> Tuple[int, int, int, int]:
+    """Return the bounding box of all monitors as (left, top, right, bottom)."""
+    sct = _get_sct()
+    monitor = sct.monitors[0]
+    left = monitor["left"]
+    top = monitor["top"]
+    right = left + monitor["width"]
+    bottom = top + monitor["height"]
+    return left, top, right, bottom
+
+
+def get_monitor_bounds_for_point(x: int, y: int) -> Dict[str, int]:
+    """Return bounds of the monitor containing the point (x, y)."""
+    sct = _get_sct()
+    for monitor in sct.monitors[1:]:
+        left = monitor["left"]
+        top = monitor["top"]
+        right = left + monitor["width"]
+        bottom = top + monitor["height"]
+        if left <= x < right and top <= y < bottom:
+            return {"left": left, "top": top, "right": right, "bottom": bottom}
+    # fallback to virtual screen
+    left, top, right, bottom = get_screen_bounds()
+    return {"left": left, "top": top, "right": right, "bottom": bottom}
+
+
 def get_screen_resolution() -> Tuple[int, int]:
-    """Return the current screen resolution."""
-    with mss.mss() as sct:
-        monitor = sct.monitors[0]
-        return monitor["width"], monitor["height"]
+    """Return the width and height of the virtual screen."""
+    left, top, right, bottom = get_screen_bounds()
+    return right - left, bottom - top
 
 
 def capture(region: Tuple[int, int, int, int] = None) -> Image:
     """Capture a screenshot of the given region."""
-    with mss.mss() as sct:
-        if region:
-            left, top, right, bottom = region
-            monitor = {
-                "left": left,
-                "top": top,
-                "width": right - left,
-                "height": bottom - top,
-            }
-        else:
-            monitor = sct.monitors[0]
+    sct = _get_sct()
+    if region:
+        left, top, right, bottom = region
+        monitor = {
+            "left": left,
+            "top": top,
+            "width": right - left,
+            "height": bottom - top,
+        }
+    else:
+        monitor = sct.monitors[0]
+
+    start = time.perf_counter()
+    try:
         screenshot = sct.grab(monitor)
-        return Image.frombytes("RGB", screenshot.size, screenshot.rgb)
+    except Exception:
+        # recreate context on failure
+        global _SCT
+        _SCT = mss.mss()
+        screenshot = _SCT.grab(monitor)
+        sct = _SCT
+
+    elapsed_ms = (time.perf_counter() - start) * 1000
+    try:
+        print(json.dumps({"time_capture_ms": round(elapsed_ms, 3)}))
+    except Exception:
+        pass
+
+    return Image.frombytes("RGB", screenshot.size, screenshot.rgb)
 
 
 def capture_around(
@@ -41,12 +96,16 @@ def capture_around(
     """Capture a screenshot centered on the given point.
 
     If ``bounds`` is provided, the captured region will be clipped to lie
-    within those bounds.
+    within those bounds. Otherwise, it is clamped to the monitor that contains
+    the point.
     """
     left = point["x"] - width // 2
     top = point["y"] - height // 2
     right = left + width
     bottom = top + height
+
+    if bounds is None:
+        bounds = get_monitor_bounds_for_point(point["x"], point["y"])
 
     if bounds:
         left = max(bounds.get("left", left), left)
@@ -54,11 +113,6 @@ def capture_around(
         right = min(bounds.get("right", right), right)
         bottom = min(bounds.get("bottom", bottom), bottom)
 
-    screen_width, screen_height = get_screen_resolution()
-    left = max(0, left)
-    top = max(0, top)
-    right = min(screen_width, right)
-    bottom = min(screen_height, bottom)
     region = (left, top, right, bottom)
     return capture(region), region
 

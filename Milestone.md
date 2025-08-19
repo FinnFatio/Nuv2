@@ -25,9 +25,9 @@ Os milestones M0–M3 representam a fundação: um **visor confiável**, enrique
     **DoD:** coordenadas do cursor batem em 100%/125%/150% de escala; teste em 1+ monitores.
     **Prioridade:** P0 • **Size:** S
 
-- [ ] **Migrar captura para `mss` (multi-monitor)**  
-  Arquivo: `screenshot.py`  
-  **DoD:** `capture()` e `capture_around()` funcionam em setups multi-monitor; p95 < 25ms para região 300×120.  
+- [X] **Migrar captura para `mss` (multi-monitor)**
+  Arquivo: `screenshot.py`
+  **DoD:** `capture()` e `capture_around()` funcionam em setups multi-monitor; p95 < 25ms para região 300×120.
   **Prioridade:** P0 • **Size:** M
 
 - [ ] **Configurar Tesseract (path/idioma/opções)**  
