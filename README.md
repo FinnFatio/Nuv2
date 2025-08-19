@@ -39,6 +39,7 @@ Opções podem ser fornecidas via variáveis de ambiente, arquivo `.env` ou arqu
 - `CAPTURE_WIDTH` – largura da região de captura (padrão: `300`)
 - `CAPTURE_HEIGHT` – altura da região de captura (padrão: `120`)
 - `UIA_THRESHOLD` – limiar de confiança para preferir texto de UIA (padrão: `0.7`)
+- `TESSERACT_CMD` – caminho para o executável do Tesseract, caso não esteja no `PATH`
 
 ## Uso
 

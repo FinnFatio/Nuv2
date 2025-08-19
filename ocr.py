@@ -1,20 +1,13 @@
 from typing import Tuple
 from PIL import Image
 import pytesseract
-import os
-import configparser
 from logger import log_call
-from settings import OCR_LANG, OCR_CFG
+from settings import OCR_LANG, OCR_CFG, TESSERACT_CMD
 
 
 try:
-    _tesseract_cmd = os.getenv("TESSERACT_CMD")
-    if not _tesseract_cmd:
-        cfg = configparser.ConfigParser()
-        cfg.read("config.ini")
-        _tesseract_cmd = cfg.get("tesseract", "tesseract_cmd", fallback=None)
-    if _tesseract_cmd:
-        pytesseract.pytesseract.tesseract_cmd = _tesseract_cmd
+    if TESSERACT_CMD:
+        pytesseract.pytesseract.tesseract_cmd = TESSERACT_CMD
 except Exception:
     pass
 
