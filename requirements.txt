@@ -3,4 +3,5 @@ mss
 Pillow
 pytesseract
 psutil
+httpx
 pygetwindow  # optional

@@ -8,10 +8,10 @@ Sempre que terminar um minor-milestone, colocar " X " dentro do " [ ] "
 ## Milestone M0 — Visor confiável (higiene básica)
 **Objetivo:** garantir que “o que está debaixo do mouse?” funcione de forma estável em qualquer monitor.
 
-- [ ] **Tornar o processo DPI-aware**  
-  Arquivo: `cursor.py` (setup de processo, antes de `GetCursorPos`)  
-  **DoD:** coordenadas do cursor batem em 100%/125%/150% de escala; teste em 1+ monitores.  
-  **Prioridade:** P0 • **Size:** S
+ - [X] **Tornar o processo DPI-aware**
+    Arquivo: `cursor.py` (setup de processo, antes de `GetCursorPos`)
+    **DoD:** coordenadas do cursor batem em 100%/125%/150% de escala; teste em 1+ monitores.
+    **Prioridade:** P0 • **Size:** S
 
 - [ ] **Migrar captura para `mss` (multi-monitor)**  
   Arquivo: `screenshot.py`  
