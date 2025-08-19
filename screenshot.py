@@ -8,11 +8,21 @@ from pathlib import Path
 from settings import CAPTURE_WIDTH, CAPTURE_HEIGHT
 
 
-def get_screen_resolution() -> Tuple[int, int]:
-    """Return the current screen resolution."""
+def get_screen_bounds() -> Tuple[int, int, int, int]:
+    """Return the bounding box of all monitors as (left, top, right, bottom)."""
     with mss.mss() as sct:
         monitor = sct.monitors[0]
-        return monitor["width"], monitor["height"]
+        left = monitor["left"]
+        top = monitor["top"]
+        right = left + monitor["width"]
+        bottom = top + monitor["height"]
+        return left, top, right, bottom
+
+
+def get_screen_resolution() -> Tuple[int, int]:
+    """Return the width and height of the virtual screen."""
+    left, top, right, bottom = get_screen_bounds()
+    return right - left, bottom - top
 
 
 def capture(region: Tuple[int, int, int, int] = None) -> Image:
@@ -54,11 +64,11 @@ def capture_around(
         right = min(bounds.get("right", right), right)
         bottom = min(bounds.get("bottom", bottom), bottom)
 
-    screen_width, screen_height = get_screen_resolution()
-    left = max(0, left)
-    top = max(0, top)
-    right = min(screen_width, right)
-    bottom = min(screen_height, bottom)
+    screen_left, screen_top, screen_right, screen_bottom = get_screen_bounds()
+    left = max(screen_left, left)
+    top = max(screen_top, top)
+    right = min(screen_right, right)
+    bottom = min(screen_bottom, bottom)
     region = (left, top, right, bottom)
     return capture(region), region
 
