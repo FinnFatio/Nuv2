@@ -1,6 +1,10 @@
 import os
 import sys
 import types
+import io
+import json
+
+import pytest
 
 # Stub out mss before importing screenshot
 sys.modules["mss"] = types.SimpleNamespace()
@@ -111,3 +115,36 @@ def test_get_monitor_bounds_for_point(monkeypatch):
         "right": 1600,
         "bottom": 600,
     }
+
+
+def test_capture_logs_time_ms(monkeypatch):
+    class DummyGrab:
+        size = (1, 1)
+        rgb = b"\x00\x00\x00"
+
+    class DummySCT:
+        def grab(self, monitor):
+            return DummyGrab
+
+    monkeypatch.setattr(screenshot, "_get_sct", lambda: DummySCT())
+    monkeypatch.setattr(
+        screenshot, "Image", types.SimpleNamespace(frombytes=lambda *a, **k: object())
+    )
+    monkeypatch.setattr(screenshot.random, "random", lambda: 0.0)
+
+    buf = io.StringIO()
+    monkeypatch.setattr(sys, "stderr", buf)
+
+    screenshot.capture((0, 0, 1, 1))
+
+    data = json.loads(buf.getvalue().strip())
+    assert "time_capture_ms" in data
+
+
+def test_capture_around_zero_area(monkeypatch):
+    monkeypatch.setattr(screenshot, "get_screen_bounds", lambda: (0, 0, 800, 600))
+    monkeypatch.setattr(screenshot, "capture", stub_capture)
+    point = {"x": 10, "y": 10}
+    bounds = {"left": 10, "top": 10, "right": 10, "bottom": 20}
+    with pytest.raises(ValueError):
+        screenshot.capture_around(point, width=100, height=100, bounds=bounds)
