@@ -88,3 +88,36 @@ def test_inspect_with_coordinates(monkeypatch):
     assert resp.status_code == 200
     assert recorded["coords"] == (5, 6)
 
+
+def test_details_unknown_id():
+    api.ELEMENT_CACHE.clear()
+    api.BOUNDS_CACHE.clear()
+    client = TestClient(api.app)
+
+    resp = client.get("/details", params={"id": "unknown"})
+    assert resp.status_code == 404
+    assert resp.json() == {"error": "id not found"}
+
+
+def test_snapshot_unknown_id(monkeypatch):
+    api.ELEMENT_CACHE.clear()
+    api.BOUNDS_CACHE.clear()
+    # Patch capture to ensure no real screenshot is attempted if the code changes
+    monkeypatch.setattr(api.screenshot, "capture", fake_capture)
+    client = TestClient(api.app)
+
+    resp = client.get("/snapshot", params={"id": "missing"})
+    assert resp.status_code == 404
+    assert resp.json() == {"error": "id not found"}
+
+
+def test_snapshot_invalid_region(monkeypatch):
+    api.ELEMENT_CACHE.clear()
+    api.BOUNDS_CACHE.clear()
+    monkeypatch.setattr(api.screenshot, "capture", fake_capture)
+    client = TestClient(api.app)
+
+    resp = client.get("/snapshot", params={"region": "bad"})
+    assert resp.status_code == 400
+    assert resp.json() == {"error": "invalid region"}
+
