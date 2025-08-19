@@ -1,7 +1,13 @@
+from __future__ import annotations
+
 from typing import Tuple, Dict, Optional
 
 import json
 import time
+import sys
+import random
+import threading
+import atexit
 
 import mss
 from PIL import Image
@@ -11,24 +17,31 @@ import re
 from pathlib import Path
 from settings import CAPTURE_WIDTH, CAPTURE_HEIGHT
 
-_SCT = None
+
+_SCT: "mss.mss" | None = None
+_SCT_LOCK = threading.Lock()
 
 
 def _reset_sct() -> None:
     global _SCT
-    try:  # pragma: no cover - best effort cleanup
-        if _SCT is not None:
-            _SCT.close()
-    except Exception:
-        pass
-    _SCT = None
+    with _SCT_LOCK:
+        try:  # pragma: no cover - best effort cleanup
+            if _SCT is not None:
+                _SCT.close()
+        except Exception:
+            pass
+        _SCT = None
 
 
 def _get_sct() -> "mss.mss":
     global _SCT
-    if _SCT is None:
-        _SCT = mss.mss()
-    return _SCT
+    with _SCT_LOCK:
+        if _SCT is None:
+            _SCT = mss.mss()
+        return _SCT
+
+
+atexit.register(_reset_sct)
 
 
 def get_screen_bounds() -> Tuple[int, int, int, int]:
@@ -53,7 +66,7 @@ def get_screen_resolution() -> Tuple[int, int]:
     return right - left, bottom - top
 
 
-def capture(region: Tuple[int, int, int, int] = None) -> Image:
+def capture(region: Tuple[int, int, int, int] = None) -> PILImage:
     """Capture a screenshot of the given region."""
     sct = _get_sct()
     if region:
@@ -79,7 +92,8 @@ def capture(region: Tuple[int, int, int, int] = None) -> Image:
         sct = _get_sct()
         screenshot = sct.grab(monitor)
     elapsed_ms = int((time.perf_counter() - start) * 1000)
-    print(json.dumps({"time_capture_ms": elapsed_ms}))
+    if random.random() < 0.1:
+        print(json.dumps({"time_capture_ms": elapsed_ms}), file=sys.stderr)
     return Image.frombytes("RGB", screenshot.size, screenshot.rgb)
 
 
@@ -137,6 +151,9 @@ def capture_around(
     top = max(screen_top, top)
     right = min(screen_right, right)
     bottom = min(screen_bottom, bottom)
+    if right <= left or bottom <= top:
+        raise ValueError("Invalid capture region")
+
     region = (left, top, right, bottom)
     return capture(region), region
 

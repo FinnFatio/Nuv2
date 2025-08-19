@@ -20,27 +20,27 @@ Os milestones M0–M3 representam a fundação: um **visor confiável**, enrique
 ## Milestone M0 — Visor confiável (higiene básica)
 **Objetivo:** garantir que “o que está debaixo do mouse?” funcione de forma estável em qualquer monitor.
 
- - [X] **Tornar o processo DPI-aware**
+ - [X] **Etapa 1: Tornar o processo DPI-aware**
     Arquivo: `cursor.py` (setup de processo, antes de `GetCursorPos`)
     **DoD:** coordenadas do cursor batem em 100%/125%/150% de escala; teste em 1+ monitores.
     **Prioridade:** P0 • **Size:** S
 
-- [X] **Migrar captura para `mss` (multi-monitor)**
+- [X] **Etapa 2: Migrar captura para `mss` (multi-monitor)**
   Arquivo: `screenshot.py`
   **DoD:** `capture()` e `capture_around()` funcionam em setups multi-monitor; p95 < 25ms para região 300×120.
   **Prioridade:** P0 • **Size:** M
 
-- [ ] **Configurar Tesseract (path/idioma/opções)**  
+- [ ] **Etapa 3: Configurar Tesseract (path/idioma/opções)**
   Arquivos: `ocr.py`, `settings.py`  
   **DoD:** erro claro se binário ausente; idioma padrão `por+eng`; flags `--oem 3 --psm 6` configuráveis; retorna confiança > 0 em texto simples.  
   **Prioridade:** P0 • **Size:** S
 
-- [ ] **Clampar região de captura aos bounds da tela**  
+- [ ] **Etapa 4: Clampar região de captura aos bounds da tela**
   Arquivo: `screenshot.py`  
   **DoD:** `capture_around()` nunca retorna bbox negativa/fora de tela; cantos funcionam.  
   **Prioridade:** P0 • **Size:** S
 
-- [ ] **Logging estruturado (JSONL) + tempos**  
+- [ ] **Etapa 5: Logging estruturado (JSONL) + tempos**
   Arquivo: ponto central em `resolve.py` (ou `logger.py`/middleware)  
   **DoD:** cada chamada a `describe_under_cursor()` emite eventos `{stage: "uia|screenshot|ocr|total", elapsed_ms, ok, err}` em JSONL.  
   **Prioridade:** P0 • **Size:** S
@@ -50,22 +50,22 @@ Os milestones M0–M3 representam a fundação: um **visor confiável**, enrique
 ## Milestone M1 — Visão útil (UIA rica + fusão decente)
 **Objetivo:** enriquecer metadados e escolher melhor entre UIA e OCR.
 
-- [ ] **Enriquecer UIA (AutomationId, patterns, flags)**  
+- [ ] **Etapa 1: Enriquecer UIA (AutomationId, patterns, flags)**
   Arquivo: `uia.py`  
   **DoD:** JSON inclui `automation_id`, `name`, `value` (quando houver), `control_type`, `is_enabled`, `is_offscreen`, `patterns[]`, `window:{handle, active}`.  
   **Prioridade:** P0 • **Size:** M
 
-- [ ] **OCR com recorte pelo elemento + heurística de fusão**  
+- [ ] **Etapa 2: OCR com recorte pelo elemento + heurística de fusão**
   Arquivos: `resolve.py`, `ocr.py`, `screenshot.py`  
   **DoD:** se há `bounds` do elemento, OCR recorta dentro; heurística usa `is_offscreen`, `control_type`, `value/name` para definir `text.chosen` e `text.source∈{uia,ocr}`; threshold em `settings.py`.  
   **Prioridade:** P1 • **Size:** M
 
-- [ ] **Telemetria consolidada**  
+- [ ] **Etapa 3: Telemetria consolidada**
   Arquivos: `resolve.py`  
   **DoD:** métricas agregadas: `time_cursor`, `time_uia`, `time_capture`, `time_ocr`; contadores de fallback (vezes que caiu em OCR).  
   **Prioridade:** P1 • **Size:** S
 
-- [ ] **Config externa centralizada**  
+- [ ] **Etapa 4: Config externa centralizada**
   Arquivos: `settings.py`  
   **DoD:** `.env/config.json` controlam: idioma OCR, box padrão (W×H), thresholds, hz do `hover_watch`, flags `run_as_admin`, etc.  
   **Prioridade:** P1 • **Size:** S
@@ -75,12 +75,12 @@ Os milestones M0–M3 representam a fundação: um **visor confiável**, enrique
 ## Milestone M2 — Operabilidade (CLIs + IDs estáveis)
 **Objetivo:** facilitar uso e permitir referência a elementos entre chamadas.
 
-- [ ] **IDs opacos e cache mínimo de estado**  
+- [ ] **Etapa 1: IDs opacos e cache mínimo de estado**
   Arquivos: `uia.py`, `resolve.py`  
   **DoD:** gerar `window_id` e `control_id` estáveis (hash de `pid + path UIA + automation_id`); expor `state_digest` com `last_window_id`, `last_editable_control_id`.  
   **Prioridade:** P0 • **Size:** M
 
-- [ ] **CLIs auxiliares**  
+- [ ] **Etapa 2: CLIs auxiliares**
   Arquivos: `hover_watch.py`, `inspect_point.py`, (novo) `screenshot_cli.py`  
   **DoD:**  
     - `hover_watch --hz 2` → JSONL contínuo do alvo (com tempos/erros).  
@@ -93,7 +93,7 @@ Os milestones M0–M3 representam a fundação: um **visor confiável**, enrique
 ## Milestone M3 — Runtime HTTP (ponte)
 **Objetivo:** expor a visão como serviço para futuros planners/LLMs.
 
-- [ ] **Serviço HTTP mínimo de inspeção e snapshot**  
+- [ ] **Etapa 1: Serviço HTTP mínimo de inspeção e snapshot**
   Arquivo: `api.py`  
   **DoD:**  
     - `GET /inspect?x=&y=` → JSON do alvo (igual ao CLI).  
