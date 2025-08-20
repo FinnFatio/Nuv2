@@ -38,6 +38,27 @@ CAPTURE_LOG_DEST=file:capturas.log LOG_LEVEL=debug LOG_FORMAT=json python hover_
 ```
 
 
+## Exemplos de saída
+
+Evento de captura em formato de texto:
+
+```
+INFO: capture region=0,0,100,100 path=out.png
+```
+
+Mesmo evento em formato JSON:
+
+```json
+{"level": "INFO", "event": "capture", "region": [0,0,100,100], "path": "out.png"}
+```
+
+Exemplo de erro na CLI:
+
+```sh
+python screenshot.py --json --region 0,0,-1,1 out.png
+# => {"error": {"code": "bad_region", "message": "Invalid capture region (0,0,-1,1)"}}
+```
+
 ## CLI
 
 ```sh
