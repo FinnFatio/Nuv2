@@ -16,6 +16,8 @@ DEFAULTS = {
     "TESSERACT_CMD": None,
     "CAPTURE_LOG_SAMPLE_RATE": 0.1,
     "CAPTURE_LOG_DEST": "stderr",
+    "LOG_LEVEL": "info",
+    "LOG_FORMAT": "text",
 }
 
 
@@ -82,15 +84,34 @@ def load_settings() -> dict:
             origins[key] = "default"
 
     cfg["CAPTURE_LOG_DEST"] = str(cfg["CAPTURE_LOG_DEST"])
+    cfg["LOG_LEVEL"] = str(cfg["LOG_LEVEL"]).lower()
+    if cfg["LOG_LEVEL"] not in {"debug", "info", "warning", "error", "critical"}:
+        print(
+            f"Invalid LOG_LEVEL={cfg['LOG_LEVEL']!r}, using default {DEFAULTS['LOG_LEVEL']!r}",
+            file=sys.stderr,
+        )
+        cfg["LOG_LEVEL"] = DEFAULTS["LOG_LEVEL"]
+        origins["LOG_LEVEL"] = "default"
+    cfg["LOG_FORMAT"] = str(cfg["LOG_FORMAT"]).lower()
+    if cfg["LOG_FORMAT"] not in {"text", "json"}:
+        print(
+            f"Invalid LOG_FORMAT={cfg['LOG_FORMAT']!r}, using default {DEFAULTS['LOG_FORMAT']!r}",
+            file=sys.stderr,
+        )
+        cfg["LOG_FORMAT"] = DEFAULTS["LOG_FORMAT"]
+        origins["LOG_FORMAT"] = "default"
+
     version_stamp = {
         "python": platform.python_version(),
         "mss": getattr(mss, "__version__", None),
         "pillow": getattr(PIL, "__version__", None),
         "pytesseract": getattr(pytesseract, "__version__", None),
     }
-    print(
-        json.dumps({"config_digest": origins, "version_stamp": version_stamp}),
-        file=sys.stderr,
+    import logger as _logger
+
+    _logger.setup(level=cfg["LOG_LEVEL"], fmt=cfg["LOG_FORMAT"])
+    _logger.get_logger().info(
+        json.dumps({"config_digest": origins, "version_stamp": version_stamp})
     )
     return cfg
 
@@ -104,3 +125,5 @@ UIA_THRESHOLD = CONFIG["UIA_THRESHOLD"]
 TESSERACT_CMD = CONFIG["TESSERACT_CMD"]
 CAPTURE_LOG_SAMPLE_RATE = CONFIG["CAPTURE_LOG_SAMPLE_RATE"]
 CAPTURE_LOG_DEST = CONFIG["CAPTURE_LOG_DEST"]
+LOG_LEVEL = CONFIG["LOG_LEVEL"]
+LOG_FORMAT = CONFIG["LOG_FORMAT"]

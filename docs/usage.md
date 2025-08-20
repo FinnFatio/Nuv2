@@ -10,6 +10,17 @@ Opções podem ser fornecidas via variáveis de ambiente, arquivo `.env` ou arqu
 - `CAPTURE_HEIGHT` – altura da região de captura (padrão: `120`)
 - `UIA_THRESHOLD` – limiar de confiança para preferir texto de UIA (padrão: `0.7`)
 - `TESSERACT_CMD` – caminho para o executável do Tesseract, caso não esteja no `PATH`
+- `CAPTURE_LOG_SAMPLE_RATE` – proporção de capturas que geram log (padrão: `0.1`)
+- `CAPTURE_LOG_DEST` – destino dos logs de captura (`stderr` ou `file:caminho`)
+- `LOG_LEVEL` – nível global de log (`debug`, `info`, `warning`; padrão: `info`)
+- `LOG_FORMAT` – formato dos logs (`text` ou `json`; padrão: `text`)
+
+Exemplo de customização do logger:
+
+```sh
+CAPTURE_LOG_DEST=file:capturas.log LOG_LEVEL=debug LOG_FORMAT=json python hover_watch.py --hz 2
+```
+
 
 ## CLI
 

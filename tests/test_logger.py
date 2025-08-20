@@ -1,3 +1,4 @@
+
 import importlib
 import json
 import time
@@ -12,7 +13,7 @@ def reload_logger():
 
 def test_log_includes_sample_id(capsys):
     reload_logger()
-    logger.setup(True)
+    logger.setup(enable=True, fmt="json")
     start = time.time()
     logger.log("stage1", start)
     logger.log("stage2", start)
@@ -24,7 +25,7 @@ def test_log_includes_sample_id(capsys):
 
 def test_log_rate_limit(capsys):
     reload_logger()
-    logger.setup(True, rate_limit_hz=1)
+    logger.setup(enable=True, fmt="json", rate_limit_hz=1)
     start = time.time()
     logger.log("stage1", start)
     logger.log("stage2", start)
@@ -34,9 +35,29 @@ def test_log_rate_limit(capsys):
 
 def test_log_rate_limit_smoke(capsys):
     reload_logger()
-    logger.setup(True, rate_limit_hz=5)
+    logger.setup(enable=True, fmt="json", rate_limit_hz=5)
     start = time.time()
     for _ in range(5):
         logger.log("stage", start)
     out = capsys.readouterr().err.strip().splitlines()
     assert len(out) == 1
+
+
+def test_log_level_filter(capsys):
+    reload_logger()
+    logger.setup(level="WARNING", fmt="json")
+    logger.get_logger().info("info")
+    logger.get_logger().warning("warn")
+    out = capsys.readouterr().err.strip().splitlines()
+    assert len(out) == 1
+    assert json.loads(out[0])["message"] == "warn"
+
+
+def test_json_format(capsys):
+    reload_logger()
+    logger.setup(level="INFO", fmt="json")
+    logger.get_logger().info("hello")
+    out = capsys.readouterr().err.strip()
+    data = json.loads(out)
+    assert data["message"] == "hello"
+    assert data["level"] == "INFO"
