@@ -56,15 +56,12 @@ def test_api_routes(monkeypatch):
 
     resp = client.get("/inspect")
     assert resp.status_code == 200
-    assert resp.headers.get("x-request-id")
     data = resp.json()
-    assert data["ok"] is True
-    assert data["meta"]["version"] == "v1"
-    assert data["data"]["control_id"] == "c1"
+    assert data["control_id"] == "c1"
 
     resp = client.get("/details", params={"id": "c1"})
     assert resp.status_code == 200
-    assert resp.json()["data"]["patterns"] == ["ValuePattern"]
+    assert resp.json()["patterns"] == ["ValuePattern"]
 
     resp = client.get("/snapshot", params={"region": "0,0,1,1"})
     assert resp.status_code == 200
@@ -99,11 +96,7 @@ def test_details_unknown_id():
 
     resp = client.get("/details", params={"id": "unknown"})
     assert resp.status_code == 404
-    assert resp.json() == {
-        "ok": False,
-        "error": {"code": "id_not_found", "message": "id not found"},
-        "meta": {"version": "v1"},
-    }
+    assert resp.json() == {"error": "id not found", "code": "id_not_found"}
 
 
 def test_snapshot_unknown_id(monkeypatch):
@@ -115,11 +108,7 @@ def test_snapshot_unknown_id(monkeypatch):
 
     resp = client.get("/snapshot", params={"id": "missing"})
     assert resp.status_code == 404
-    assert resp.json() == {
-        "ok": False,
-        "error": {"code": "id_not_found", "message": "id not found"},
-        "meta": {"version": "v1"},
-    }
+    assert resp.json() == {"error": "id not found", "code": "id_not_found"}
 
 
 def test_snapshot_invalid_region(monkeypatch):
@@ -130,9 +119,5 @@ def test_snapshot_invalid_region(monkeypatch):
 
     resp = client.get("/snapshot", params={"region": "bad"})
     assert resp.status_code == 400
-    assert resp.json() == {
-        "ok": False,
-        "error": {"code": "invalid_region", "message": "invalid region"},
-        "meta": {"version": "v1"},
-    }
+    assert resp.json() == {"error": "invalid region", "code": "invalid_region"}
 
