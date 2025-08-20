@@ -32,7 +32,7 @@ def test_load_settings_priority_and_invalid(monkeypatch, tmp_path, capsys):
 
 def test_version_stamp_in_config_digest(monkeypatch, capsys):
     monkeypatch.setenv("LOG_FORMAT", "json")
-    monkeypatch.setenv("NU_LOG_SETTINGS", "1")
+    monkeypatch.setenv("LOG_LEVEL", "debug")
     importlib.reload(settings)
     out = capsys.readouterr().err.strip()
     data = json.loads(out)
@@ -59,7 +59,7 @@ def test_capture_log_dest_fallback(monkeypatch, capsys):
 
     monkeypatch.setenv("CAPTURE_LOG_DEST", "file:some/path/log.txt")
     monkeypatch.setenv("LOG_FORMAT", "json")
-    monkeypatch.setenv("NU_LOG_SETTINGS", "1")
+    monkeypatch.setenv("LOG_LEVEL", "debug")
     monkeypatch.setattr(Path, "mkdir", fake_mkdir)
     importlib.reload(settings)
     err = capsys.readouterr().err

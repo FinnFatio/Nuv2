@@ -5,6 +5,7 @@ import time
 import uuid
 from functools import wraps
 import contextvars
+import threading
 
 import metrics
 
@@ -12,6 +13,7 @@ ENABLED = False
 SAMPLE_ID = uuid.uuid4().hex[:8]
 RATE_LIMIT_INTERVAL = None
 _LAST_LOG_TIME = 0.0
+_LAST_LOG_LOCK = threading.Lock()
 LOGGER = logging.getLogger("nuv2")
 LOGGER.addHandler(logging.NullHandler())
 
@@ -106,9 +108,10 @@ def log(
     now = time.time()
     if RATE_LIMIT_INTERVAL is not None:
         global _LAST_LOG_TIME
-        if now - _LAST_LOG_TIME < RATE_LIMIT_INTERVAL:
-            return
-        _LAST_LOG_TIME = now
+        with _LAST_LOG_LOCK:
+            if now - _LAST_LOG_TIME < RATE_LIMIT_INTERVAL:
+                return
+            _LAST_LOG_TIME = now
     elapsed_ms = int((now - start) * 1000)
     data = {
         "stage": stage,
