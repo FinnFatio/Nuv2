@@ -2,7 +2,7 @@ import argparse
 import ctypes
 
 from resolve import describe_under_cursor
-from logger import setup
+from logger import setup, COMPONENT
 from cli import emit_cli_json
 
 
@@ -15,7 +15,8 @@ def main(argv=None):
     )
     args = parser.parse_args(argv)
 
-    setup(args.jsonl, rate_limit_hz=args.rate_limit_hz)
+    setup(enable=args.jsonl, jsonl=args.jsonl, rate_limit_hz=args.rate_limit_hz)
+    COMPONENT.set("cli")
 
     try:
         # Chamada evita deslocamento de coordenadas em ambientes com scaling >100%.

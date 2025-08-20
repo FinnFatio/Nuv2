@@ -1,6 +1,6 @@
 import argparse
 import resolve
-from logger import setup
+from logger import setup, COMPONENT
 from cli import emit_cli_json
 
 
@@ -12,7 +12,8 @@ def main() -> None:
         "--rate-limit-hz", type=float, default=None, help="max log frequency"
     )
     args = parser.parse_args()
-    setup(args.jsonl, rate_limit_hz=args.rate_limit_hz)
+    setup(enable=args.jsonl, jsonl=args.jsonl, rate_limit_hz=args.rate_limit_hz)
+    COMPONENT.set("cli")
     if args.point:
         x, y = map(int, args.point.split(","))
         resolve.get_position = lambda: {"x": x, "y": y}
