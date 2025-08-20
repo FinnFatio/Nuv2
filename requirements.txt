@@ -1,7 +1,7 @@
 fastapi
-mss
-Pillow
-pytesseract
+mss>=10.1.0
+Pillow>=11.3.0
+pytesseract>=0.3.13
 psutil
 httpx
 pygetwindow  # optional
