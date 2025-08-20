@@ -1,5 +1,6 @@
 import importlib
 import json
+from pathlib import Path
 
 import settings
 
@@ -31,6 +32,7 @@ def test_load_settings_priority_and_invalid(monkeypatch, tmp_path, capsys):
 
 def test_version_stamp_in_config_digest(monkeypatch, capsys):
     monkeypatch.setenv("LOG_FORMAT", "json")
+    monkeypatch.setenv("NU_LOG_SETTINGS", "1")
     importlib.reload(settings)
     out = capsys.readouterr().err.strip()
     data = json.loads(out)
@@ -49,3 +51,17 @@ def test_log_level_env(monkeypatch, capsys):
     out = capsys.readouterr().err.strip().splitlines()
     assert len(out) == 1
     assert json.loads(out[0])["message"] == "warn"
+
+
+def test_capture_log_dest_fallback(monkeypatch, capsys):
+    def fake_mkdir(self, *args, **kwargs):
+        raise PermissionError
+
+    monkeypatch.setenv("CAPTURE_LOG_DEST", "file:some/path/log.txt")
+    monkeypatch.setenv("LOG_FORMAT", "json")
+    monkeypatch.setenv("NU_LOG_SETTINGS", "1")
+    monkeypatch.setattr(Path, "mkdir", fake_mkdir)
+    importlib.reload(settings)
+    err = capsys.readouterr().err
+    assert "CAPTURE_LOG_DEST" in err
+    assert settings.CAPTURE_LOG_DEST == "stderr"

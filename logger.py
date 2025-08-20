@@ -1,8 +1,12 @@
 import json
 import logging
+import os
 import time
 import uuid
 from functools import wraps
+import contextvars
+
+import metrics
 
 ENABLED = False
 SAMPLE_ID = uuid.uuid4().hex[:8]
@@ -10,6 +14,27 @@ RATE_LIMIT_INTERVAL = None
 _LAST_LOG_TIME = 0.0
 LOGGER = logging.getLogger("nuv2")
 LOGGER.addHandler(logging.NullHandler())
+
+# Context variables for rich logging
+REQUEST_ID: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "request_id", default=None
+)
+MONITOR: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "monitor", default=None
+)
+REGION: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "region", default=None
+)
+COMPONENT: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "component", default=None
+)
+
+_METRIC_MAP = {
+    "get_position": "cursor",
+    "get_element_info": "uia",
+    "capture": "capture",
+    "extract_text": "ocr",
+}
 
 
 class JsonFormatter(logging.Formatter):
@@ -35,7 +60,8 @@ def setup(
     enable: bool = False,
     rate_limit_hz: float | None = None,
     level: str = "INFO",
-    fmt: str = "text",
+    jsonl: bool | None = None,
+    fmt: str | None = None,
 ) -> logging.Logger:
     """Configure logging and return the shared logger."""
     global ENABLED, RATE_LIMIT_INTERVAL, _LAST_LOG_TIME
@@ -43,11 +69,19 @@ def setup(
     LOGGER.handlers.clear()
     LOGGER.propagate = False
     handler = logging.StreamHandler()
+
+    # Determine format: explicit fmt overrides jsonl flag
+    if fmt is None:
+        fmt = "json" if jsonl else "text"
     if fmt == "json":
         handler.setFormatter(JsonFormatter())
     else:
         handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
     LOGGER.addHandler(handler)
+
+    env_level = os.getenv("LOG_LEVEL")
+    if env_level:
+        level = env_level
     try:
         LOGGER.setLevel(getattr(logging, level.upper()))
     except Exception:  # pragma: no cover - invalid level
@@ -60,8 +94,13 @@ def setup(
     return LOGGER
 
 
-def log(stage: str, start: float, error: str | None = None) -> None:
-    """Emit a JSON log line with stage, elapsed_ms and error."""
+def log(
+    stage: str,
+    start: float,
+    error: str | None = None,
+    level: str = "INFO",
+) -> None:
+    """Emit a JSON log line with stage, elapsed_ms, error and context."""
     if not ENABLED:
         return
     now = time.time()
@@ -71,16 +110,29 @@ def log(stage: str, start: float, error: str | None = None) -> None:
             return
         _LAST_LOG_TIME = now
     elapsed_ms = int((now - start) * 1000)
-    LOGGER.info(
-        json.dumps(
-            {
-                "stage": stage,
-                "elapsed_ms": elapsed_ms,
-                "error": error,
-                "sample_id": SAMPLE_ID,
-            }
-        )
-    )
+    data = {
+        "stage": stage,
+        "elapsed_ms": elapsed_ms,
+        "error": error,
+        "sample_id": SAMPLE_ID,
+    }
+    req_id = REQUEST_ID.get()
+    if req_id:
+        data["request_id"] = req_id
+    monitor = MONITOR.get()
+    if monitor:
+        data["monitor"] = monitor
+    region = REGION.get()
+    if region:
+        data["region"] = region
+    component = COMPONENT.get()
+    if component:
+        data["component"] = component
+    try:
+        lvl = getattr(logging, level.upper())
+    except Exception:  # pragma: no cover - invalid level
+        lvl = logging.INFO
+    LOGGER.log(lvl, json.dumps(data))
 
 
 def log_call(func):
@@ -93,7 +145,11 @@ def log_call(func):
             result = func(*args, **kwargs)
         except Exception as e:  # pragma: no cover - re-raises original exception
             log(f"{func.__name__}.error", start, error=str(e))
+            elapsed = int((time.time() - start) * 1000)
+            metrics.record_time(_METRIC_MAP.get(func.__name__, ""), elapsed)
             raise
+        elapsed = int((time.time() - start) * 1000)
+        metrics.record_time(_METRIC_MAP.get(func.__name__, ""), elapsed)
         log(f"{func.__name__}.end", start)
         return result
 

@@ -1,6 +1,8 @@
 import ctypes
 from typing import Dict
 
+from logger import log_call
+
 
 # Try to make process DPI aware on Windows. This is a no-op on other systems.
 try:  # pragma: no cover - platform specific best-effort
@@ -19,6 +21,7 @@ class _POINT(ctypes.Structure):
     _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
 
 
+@log_call
 def get_position() -> Dict[str, int]:
     """Return current cursor position as a dict with x and y."""
     if _windll is None:  # pragma: no cover - executed only on non-Windows

@@ -13,9 +13,17 @@ python screenshot.py --region 0,0,100,100 regiao.png
 python screenshot.py --active ativa.png
 # => salva ativa.png
 
+# Capturar um monitor específico
+python screenshot.py --monitor mon2 mon2.png
+# => salva mon2.png
+
 # Emitir JSON junto da captura
 python screenshot.py --json --region 0,0,1,1 exemplo.png
 # => {"output": "exemplo.png", "region": [0, 0, 1, 1]}
+
+# Exemplo de erro mapeado
+python screenshot.py --json --window "janela_que_nao_existe" erro.png
+# => {"error": {"code": "window_not_found", "message": "No window matches pattern"}}
 ```
 
 Para detalhes completos de configuração, uso da CLI e API, consulte [docs/usage.md](docs/usage.md).

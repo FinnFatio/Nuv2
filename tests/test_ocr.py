@@ -1,36 +1,53 @@
 import os
 import sys
-import types
-import importlib
+from PIL import Image
 import pytest
 
 ROOT = os.path.dirname(os.path.dirname(__file__))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
+import ocr
 
-def test_extract_text_missing_tesseract(monkeypatch):
-    pytesseract_stub = types.SimpleNamespace(
-        Output=types.SimpleNamespace(DICT={}),
-        pytesseract=types.SimpleNamespace(tesseract_cmd=""),
-        image_to_data=lambda *a, **k: {},
-    )
-    sys.modules["pytesseract"] = pytesseract_stub
 
-    pil_module = types.ModuleType("PIL")
-    class DummyImage:
-        pass
-    pil_module.Image = DummyImage
-    sys.modules["PIL"] = pil_module
+def test_extract_text_passes_lang_and_cfg(monkeypatch):
+    recorded = {}
 
-    sys.modules.pop("ocr", None)
-    import ocr
-    importlib.reload(ocr)
+    def fake_image_to_data(img, output_type, lang, config):
+        recorded["lang"] = lang
+        recorded["config"] = config
+        return {"text": ["foo"], "conf": ["100"]}
 
-    def boom(*args, **kwargs):
+    monkeypatch.setattr(ocr.pytesseract, "image_to_data", fake_image_to_data, raising=False)
+    monkeypatch.setattr(ocr.pytesseract, "Output", type("O", (), {"DICT": None}), raising=False)
+    img = Image.new("RGB", (10, 10))
+    text, conf = ocr.extract_text(img)
+    assert text == "foo"
+    assert conf == 1.0
+    assert recorded["lang"] == ocr.OCR_LANG
+    assert recorded["config"] == ocr.OCR_CFG
+
+
+def test_extract_text_missing_binary(monkeypatch):
+    def raise_not_found(*args, **kwargs):
         raise FileNotFoundError("missing")
 
-    monkeypatch.setattr(ocr.pytesseract, "image_to_data", boom)
-    with pytest.raises(RuntimeError) as excinfo:
-        ocr.extract_text(ocr.Image())
-    assert "Tesseract binary not found" in str(excinfo.value)
+    monkeypatch.setattr(ocr.pytesseract, "image_to_data", raise_not_found, raising=False)
+    monkeypatch.setattr(ocr.pytesseract, "Output", type("O", (), {"DICT": None}), raising=False)
+    img = Image.new("RGB", (10, 10))
+    with pytest.raises(RuntimeError) as exc:
+        ocr.extract_text(img)
+    assert "tesseract_missing" in str(exc.value)
+
+
+def test_invalid_tesseract_cmd(monkeypatch):
+    import importlib
+    import settings as settings_module
+
+    monkeypatch.setenv("TESSERACT_CMD", "nonexistent")
+    importlib.reload(settings_module)
+    with pytest.raises(RuntimeError):
+        importlib.reload(ocr)
+    monkeypatch.delenv("TESSERACT_CMD", raising=False)
+    importlib.reload(settings_module)
+    importlib.reload(ocr)

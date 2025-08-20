@@ -18,7 +18,13 @@ DEFAULTS = {
     "CAPTURE_LOG_DEST": "stderr",
     "LOG_LEVEL": "info",
     "LOG_FORMAT": "text",
+    "SNAPSHOT_MAX_AREA": 2_000_000,
+    "SNAPSHOT_MAX_SIDE": 2000,
+    "API_RATE_LIMIT_PER_MIN": 60,
+    "API_CORS_ORIGINS": "",
 }
+
+CONFIG_SOURCES = {}
 
 
 def _load_env_file(path: Path) -> dict:
@@ -61,7 +67,13 @@ def load_settings() -> dict:
             cfg[key] = os.environ[key]
             origins[key] = "env"
 
-    for key in ("CAPTURE_WIDTH", "CAPTURE_HEIGHT"):
+    for key in (
+        "CAPTURE_WIDTH",
+        "CAPTURE_HEIGHT",
+        "SNAPSHOT_MAX_AREA",
+        "SNAPSHOT_MAX_SIDE",
+        "API_RATE_LIMIT_PER_MIN",
+    ):
         try:
             cfg[key] = int(cfg[key])
         except Exception:
@@ -101,6 +113,20 @@ def load_settings() -> dict:
         cfg["LOG_FORMAT"] = DEFAULTS["LOG_FORMAT"]
         origins["LOG_FORMAT"] = "default"
 
+    if cfg["CAPTURE_LOG_DEST"].startswith("file:"):
+        path = Path(cfg["CAPTURE_LOG_DEST"][5:])
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            if not os.access(path.parent, os.W_OK):
+                raise PermissionError
+        except Exception:
+            print(
+                f"CAPTURE_LOG_DEST {cfg['CAPTURE_LOG_DEST']!r} not writable; using stderr",
+                file=sys.stderr,
+            )
+            cfg["CAPTURE_LOG_DEST"] = "stderr"
+            origins["CAPTURE_LOG_DEST"] = "env" if "CAPTURE_LOG_DEST" in os.environ else "default"
+
     version_stamp = {
         "python": platform.python_version(),
         "mss": getattr(mss, "__version__", None),
@@ -110,9 +136,16 @@ def load_settings() -> dict:
     import logger as _logger
 
     _logger.setup(level=cfg["LOG_LEVEL"], fmt=cfg["LOG_FORMAT"])
-    _logger.get_logger().info(
-        json.dumps({"config_digest": origins, "version_stamp": version_stamp})
-    )
+    if (
+        os.getenv("NU_LOG_SETTINGS") == "1"
+        or os.getenv("DEBUG") == "1"
+        or __name__ == "__main__"
+    ):
+        _logger.get_logger().info(
+            json.dumps({"config_digest": origins, "version_stamp": version_stamp})
+        )
+    global CONFIG_SOURCES
+    CONFIG_SOURCES = origins
     return cfg
 
 
@@ -127,3 +160,7 @@ CAPTURE_LOG_SAMPLE_RATE = CONFIG["CAPTURE_LOG_SAMPLE_RATE"]
 CAPTURE_LOG_DEST = CONFIG["CAPTURE_LOG_DEST"]
 LOG_LEVEL = CONFIG["LOG_LEVEL"]
 LOG_FORMAT = CONFIG["LOG_FORMAT"]
+SNAPSHOT_MAX_AREA = CONFIG["SNAPSHOT_MAX_AREA"]
+SNAPSHOT_MAX_SIDE = CONFIG["SNAPSHOT_MAX_SIDE"]
+API_RATE_LIMIT_PER_MIN = CONFIG["API_RATE_LIMIT_PER_MIN"]
+API_CORS_ORIGINS = CONFIG["API_CORS_ORIGINS"]

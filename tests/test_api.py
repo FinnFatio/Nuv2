@@ -56,16 +56,21 @@ def test_api_routes(monkeypatch):
 
     resp = client.get("/inspect")
     assert resp.status_code == 200
+    assert resp.headers.get("x-request-id")
     data = resp.json()
-    assert data["control_id"] == "c1"
+    assert data["ok"] is True
+    assert data["meta"]["version"] == "v1"
+    assert data["data"]["control_id"] == "c1"
+    assert data["data"]["window_id"] == "w1"
 
     resp = client.get("/details", params={"id": "c1"})
     assert resp.status_code == 200
-    assert resp.json()["patterns"] == ["ValuePattern"]
+    assert resp.json()["data"]["patterns"] == ["ValuePattern"]
 
     resp = client.get("/snapshot", params={"region": "0,0,1,1"})
     assert resp.status_code == 200
     assert resp.headers["content-type"] == "image/png"
+    assert resp.headers["cache-control"] == "no-store"
 
     resp = client.get("/snapshot", params={"id": "c1"})
     assert resp.status_code == 200
@@ -87,6 +92,9 @@ def test_inspect_with_coordinates(monkeypatch):
     resp = client.get("/inspect", params={"x": 5, "y": 6})
     assert resp.status_code == 200
     assert recorded["coords"] == (5, 6)
+    data = resp.json()["data"]
+    assert data["control_id"] == "c1"
+    assert data["window_id"] == "w1"
 
 
 def test_details_unknown_id():
@@ -96,7 +104,11 @@ def test_details_unknown_id():
 
     resp = client.get("/details", params={"id": "unknown"})
     assert resp.status_code == 404
-    assert resp.json() == {"error": "id not found", "code": "id_not_found"}
+    assert resp.json() == {
+        "ok": False,
+        "error": {"code": "id_not_found", "message": "id not found"},
+        "meta": {"version": "v1"},
+    }
 
 
 def test_snapshot_unknown_id(monkeypatch):
@@ -108,7 +120,11 @@ def test_snapshot_unknown_id(monkeypatch):
 
     resp = client.get("/snapshot", params={"id": "missing"})
     assert resp.status_code == 404
-    assert resp.json() == {"error": "id not found", "code": "id_not_found"}
+    assert resp.json() == {
+        "ok": False,
+        "error": {"code": "id_not_found", "message": "id not found"},
+        "meta": {"version": "v1"},
+    }
 
 
 def test_snapshot_invalid_region(monkeypatch):
@@ -119,5 +135,68 @@ def test_snapshot_invalid_region(monkeypatch):
 
     resp = client.get("/snapshot", params={"region": "bad"})
     assert resp.status_code == 400
-    assert resp.json() == {"error": "invalid region", "code": "invalid_region"}
+    assert resp.json() == {
+        "ok": False,
+        "error": {"code": "invalid_region", "message": "invalid region"},
+        "meta": {"version": "v1"},
+    }
+
+
+def test_snapshot_missing_id_and_region():
+    api.ELEMENT_CACHE.clear()
+    api.BOUNDS_CACHE.clear()
+    client = TestClient(api.app)
+    resp = client.get("/snapshot")
+    assert resp.status_code == 400
+    assert resp.json()["error"]["code"] == "missing_id_or_region"
+
+
+def test_snapshot_both_id_and_region(monkeypatch):
+    api.ELEMENT_CACHE.clear()
+    api.BOUNDS_CACHE.clear()
+    monkeypatch.setattr(api.screenshot, "capture", fake_capture)
+    api.BOUNDS_CACHE["c1"] = {"left": 0, "top": 0, "right": 1, "bottom": 1}
+    client = TestClient(api.app)
+    resp = client.get("/snapshot", params={"id": "c1", "region": "0,0,1,1"})
+    assert resp.status_code == 400
+    assert resp.json()["error"]["code"] == "missing_id_or_region"
+
+
+def test_snapshot_capture_error_map(monkeypatch):
+    api.ELEMENT_CACHE.clear()
+    api.BOUNDS_CACHE.clear()
+    def boom(region):
+        raise ValueError("No active window found")
+    monkeypatch.setattr(api.screenshot, "capture", boom)
+    client = TestClient(api.app)
+    resp = client.get("/snapshot", params={"region": "0,0,1,1"})
+    assert resp.status_code == 400
+    assert resp.json()["error"]["code"] == "no_active_window"
+
+
+def test_snapshot_region_too_large(monkeypatch):
+    api.ELEMENT_CACHE.clear()
+    api.BOUNDS_CACHE.clear()
+    monkeypatch.setattr(api.screenshot, "capture", fake_capture)
+    monkeypatch.setattr(api, "SNAPSHOT_MAX_AREA", 4)
+    monkeypatch.setattr(api, "SNAPSHOT_MAX_SIDE", 3)
+    client = TestClient(api.app)
+    resp = client.get("/snapshot", params={"region": "0,0,3,3"})
+    assert resp.status_code == 400
+    assert resp.json()["error"]["code"] == "region_too_large"
+
+
+def test_rate_limit(monkeypatch):
+    api.ELEMENT_CACHE.clear()
+    api.BOUNDS_CACHE.clear()
+    monkeypatch.setattr(api.resolve, "describe_under_cursor", fake_describe_under_cursor)
+    monkeypatch.setattr(api, "API_RATE_LIMIT_PER_MIN", 2)
+    api._REQUEST_LOG.clear()
+    client = TestClient(api.app)
+    client.get("/inspect")
+    client.get("/inspect")
+    resp = client.get("/inspect")
+    assert resp.status_code == 429
+    data = resp.json()
+    assert data["error"]["code"] == "rate_limit"
 

@@ -20,11 +20,13 @@ from settings import (
     CAPTURE_LOG_SAMPLE_RATE,
     CAPTURE_LOG_DEST,
 )
+from logger import log_call
 
 ERROR_CODE_MAP = {
     "pygetwindow is required for window capture": "pygetwindow_missing",
     "No active window found": "no_active_window",
     "No window matches pattern": "window_not_found",
+    "window search timeout": "window_search_timeout",
 }
 
 
@@ -32,7 +34,21 @@ _SCT: "mss.mss" | None = None
 _SCT_LOCK = threading.Lock()
 
 
-def _reset_sct() -> None:
+def _log_sampled(data: Dict[str, object]) -> None:
+    if CAPTURE_LOG_SAMPLE_RATE > 0 and random.random() < CAPTURE_LOG_SAMPLE_RATE:
+        line = json.dumps(data)
+        if CAPTURE_LOG_DEST == "stderr":
+            print(line, file=sys.stderr)
+        elif CAPTURE_LOG_DEST.startswith("file:"):
+            path = Path(CAPTURE_LOG_DEST[5:])
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open("a", encoding="utf-8") as f:
+                f.write(line + "\n")
+
+
+def _reset_sct(reason: str | None = None) -> None:
+    if reason is not None:
+        _log_sampled({"stage": "mss.reset", "reason": reason})
     global _SCT
     with _SCT_LOCK:
         try:  # pragma: no cover - best effort cleanup
@@ -77,7 +93,7 @@ def get_screen_bounds() -> Tuple[int, int, int, int]:
     try:
         monitor = sct.monitors[0]
     except Exception:
-        _reset_sct()
+        _reset_sct("monitors_failed")
         sct = _get_sct()
         monitor = sct.monitors[0]
     left = monitor["left"]
@@ -93,6 +109,51 @@ def get_screen_resolution() -> Tuple[int, int]:
     return right - left, bottom - top
 
 
+def get_monitor_bounds(label: str) -> Dict[str, int]:
+    """Return bounds of monitor given its label (mon1|mon2|virtual)."""
+    sct = _get_sct()
+    try:
+        monitors = sct.monitors
+    except Exception:
+        _reset_sct("monitors_failed")
+        sct = _get_sct()
+        monitors = sct.monitors
+    if label == "virtual":
+        mon = monitors[0]
+    elif label.startswith("mon"):
+        idx = int(label[3:])
+        if idx <= 0 or idx >= len(monitors):
+            raise ValueError(f"unknown monitor {label}")
+        mon = monitors[idx]
+    else:
+        raise ValueError(f"unknown monitor {label}")
+    left = mon["left"]
+    top = mon["top"]
+    right = left + mon["width"]
+    bottom = top + mon["height"]
+    return {"left": left, "top": top, "right": right, "bottom": bottom}
+
+
+def health_check() -> Dict[str, object]:
+    """Return basic capture bounds and latency information."""
+    left, top, right, bottom = get_screen_bounds()
+    sct = _get_sct()
+    monitor = {"left": left, "top": top, "width": 1, "height": 1}
+    start = time.perf_counter()
+    try:
+        sct.grab(monitor)
+    except Exception:
+        _reset_sct("monitors_failed")
+        sct = _get_sct()
+        sct.grab(monitor)
+    latency_ms = int((time.perf_counter() - start) * 1000)
+    return {
+        "bounds": {"left": left, "top": top, "right": right, "bottom": bottom},
+        "latency_ms": latency_ms,
+    }
+
+
+@log_call
 def capture(region: Tuple[int, int, int, int] = None) -> Image.Image:
     """Capture a screenshot of the given region."""
     sct = _get_sct()
@@ -110,7 +171,7 @@ def capture(region: Tuple[int, int, int, int] = None) -> Image.Image:
         try:
             monitor = sct.monitors[0]
         except Exception:
-            _reset_sct()
+            _reset_sct("monitors_failed")
             sct = _get_sct()
             monitor = sct.monitors[0]
         bounds = {"monitor": "virtual"}
@@ -118,21 +179,11 @@ def capture(region: Tuple[int, int, int, int] = None) -> Image.Image:
     try:
         screenshot = sct.grab(monitor)
     except Exception:
-        _reset_sct()
+        _reset_sct("monitors_failed")
         sct = _get_sct()
         screenshot = sct.grab(monitor)
     elapsed_ms = int((time.perf_counter() - start) * 1000)
-    if CAPTURE_LOG_SAMPLE_RATE > 0 and random.random() < CAPTURE_LOG_SAMPLE_RATE:
-        log_line = json.dumps(
-            {"time_capture_ms": elapsed_ms, "monitor": bounds.get("monitor", "unknown")}
-        )
-        if CAPTURE_LOG_DEST == "stderr":
-            print(log_line, file=sys.stderr)
-        elif CAPTURE_LOG_DEST.startswith("file:"):
-            path = Path(CAPTURE_LOG_DEST[5:])
-            path.parent.mkdir(parents=True, exist_ok=True)
-            with path.open("a", encoding="utf-8") as f:
-                f.write(log_line + "\n")
+    _log_sampled({"time_capture_ms": elapsed_ms, "monitor": bounds.get("monitor", "unknown")})
     return Image.frombytes("RGB", screenshot.size, screenshot.rgb)
 
 
@@ -146,7 +197,7 @@ def get_monitor_bounds_for_point(x: int, y: int) -> Dict[str, int]:
     try:
         monitors = sct.monitors
     except Exception:
-        _reset_sct()
+        _reset_sct("monitors_failed")
         sct = _get_sct()
         monitors = sct.monitors
     for idx, mon in enumerate(monitors[1:], start=1):
@@ -218,6 +269,27 @@ def _parse_region(arg: str) -> Dict[str, int]:
     return {"left": x, "top": y, "width": w, "height": h}
 
 
+def _get_windows(gw, timeout: Optional[float]) -> list:
+    result = []
+    exc: Exception | None = None
+
+    def worker():
+        nonlocal result, exc
+        try:
+            result = gw.getAllWindows()
+        except Exception as e:  # pragma: no cover - defensive
+            exc = e
+
+    t = threading.Thread(target=worker)
+    t.start()
+    t.join(timeout)
+    if t.is_alive():
+        raise SystemExit("window search timeout")
+    if exc:
+        raise exc
+    return result
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Save a screenshot to a PNG file")
     group = parser.add_mutually_exclusive_group()
@@ -226,9 +298,13 @@ def main() -> None:
     )
     group.add_argument("--window", type=str, help="capture first window matching regex")
     group.add_argument("--region", type=str, help="capture explicit region x,y,w,h")
+    group.add_argument("--monitor", type=str, help="capture entire monitor by label")
     parser.add_argument("--json", action="store_true", help="output JSON result")
     parser.add_argument(
         "--first", type=int, default=None, help="limit window search to first N"
+    )
+    parser.add_argument(
+        "--timeout", type=float, default=None, help="timeout for window search"
     )
     parser.add_argument(
         "output", nargs="?", default="screenshot.png", help="output PNG path"
@@ -244,6 +320,9 @@ def main() -> None:
                 mon["left"] + mon["width"],
                 mon["top"] + mon["height"],
             )
+        elif args.monitor:
+            mon = get_monitor_bounds(args.monitor)
+            region = (mon["left"], mon["top"], mon["right"], mon["bottom"])
         elif args.active or args.window:
             try:
                 import pygetwindow as gw
@@ -254,14 +333,14 @@ def main() -> None:
                 if win is None:
                     raise SystemExit("No active window found")
             else:
-                  pattern = re.compile(args.window, re.IGNORECASE)
-                  windows = gw.getAllWindows()
-                  if args.first is not None:
-                      windows = windows[: args.first]
-                  matches = [w for w in windows if pattern.search(w.title)]
-                  if not matches:
-                      raise SystemExit("No window matches pattern")
-                  win = matches[0]
+                pattern = re.compile(args.window, re.IGNORECASE)
+                windows = _get_windows(gw, args.timeout)
+                if args.first is not None:
+                    windows = windows[: args.first]
+                matches = [w for w in windows if pattern.search(w.title)]
+                if not matches:
+                    raise SystemExit("No window matches pattern")
+                win = matches[0]
             region = (
                 win.left,
                 win.top,
@@ -270,14 +349,14 @@ def main() -> None:
             )
         img = capture(region)
     except ValueError as e:
-        data = {"error": str(e), "code": "bad_region"}
+        data = {"error": {"code": "bad_region", "message": str(e)}}
         if region is not None:
             data["region"] = region
         print(json.dumps(data))
         sys.exit(2)
     except SystemExit as e:  # standardize CLI errors as JSON
         msg = str(e)
-        data = {"error": msg, "code": ERROR_CODE_MAP.get(msg, "unknown")}
+        data = {"error": {"code": ERROR_CODE_MAP.get(msg, "unknown"), "message": msg}}
         print(json.dumps(data))
         code = e.code if isinstance(e.code, int) else 1
         sys.exit(code)

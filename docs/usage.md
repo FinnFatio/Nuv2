@@ -14,6 +14,7 @@ Opções podem ser fornecidas via variáveis de ambiente, arquivo `.env` ou arqu
 - `CAPTURE_LOG_DEST` – destino dos logs de captura (`stderr` ou `file:caminho`)
 - `LOG_LEVEL` – nível global de log (`debug`, `info`, `warning`; padrão: `info`)
 - `LOG_FORMAT` – formato dos logs (`text` ou `json`; padrão: `text`)
+- `NU_LOG_SETTINGS` – quando `1`, emite digest de configuração e versão no início
 
 Exemplo de customização do logger:
 
@@ -42,6 +43,42 @@ Capturar uma imagem:
 python screenshot.py --region 0,0,800,600 exemplo.png
 ```
 
+Capturar um monitor específico:
+
+```sh
+python screenshot.py --monitor mon2 monitor.png
+```
+
+Aplicar timeout na busca de janela:
+
+```sh
+python screenshot.py --window bloco --timeout 0.5 out.png
+```
+
+As ferramentas de CLI e API retornam erros no formato:
+
+```json
+{"error": {"code": "...", "message": "..."}}
+```
+
+Exemplo de erro mapeado:
+
+```sh
+python screenshot.py --json --window janela_inexistente out.png
+# => {"error": {"code": "window_not_found", "message": "No window matches pattern"}}
+```
+
+### Instalação do Tesseract
+
+O OCR depende do [Tesseract-OCR](https://github.com/tesseract-ocr/tesseract). No Windows, baixe o instalador em
+<https://github.com/UB-Mannheim/tesseract/wiki> e adicione o diretório de instalação ao `PATH` do sistema. Caso o binário
+não esteja no `PATH`, defina `TESSERACT_CMD` apontando para o executável.
+
+### Saúde da captura
+
+Para diagnósticos rápidos, `screenshot.health_check()` retorna os limites atuais da
+tela e a latência aproximada de captura.
+
 Inspecionar um ponto específico:
 
 ```sh
@@ -63,6 +100,7 @@ Após iniciar o servidor, os seguintes endpoints estão disponíveis:
 - `GET /inspect?x=&y=` – JSON do alvo.
 - `GET /details?id=` – metadados e affordances.
 - `GET /snapshot?id=ID` ou `GET /snapshot?region=x,y,w,h` – imagem PNG.
+- `GET /metrics` – métricas agregadas de latência, fallbacks e erros.
 
 Um ciclo típico de automação é **observe → plan → act → verify**:
 
@@ -72,6 +110,23 @@ Um ciclo típico de automação é **observe → plan → act → verify**:
 4. **Verify** chamando novamente `GET /inspect` para confirmar o resultado.
 
 As respostas e logs seguem a mesma estrutura JSON das ferramentas de linha de comando.
+
+### Códigos de erro
+
+| Código              | Descrição exemplo                      |
+|---------------------|----------------------------------------|
+| `id_not_found`      | ID não encontrado                       |
+| `missing_id_or_region` | Parâmetros `id` ou `region` ausentes |
+| `invalid_region`    | Região inválida                         |
+| `region_too_large`  | Região excede limite                    |
+| `pygetwindow_missing` | pygetwindow ausente para captura       |
+| `no_active_window`  | Nenhuma janela ativa                    |
+| `window_not_found`  | Nenhuma janela corresponde ao padrão    |
+| `window_search_timeout` | Busca de janela demorou demais      |
+| `rate_limit`        | Limite de requisições excedido          |
+| `bad_region`        | Região inválida na CLI                  |
+| `tesseract_missing` | Binário do Tesseract ausente            |
+| `capture_failed`    | Falha inesperada na captura             |
 
 ## Próximos Passos
 

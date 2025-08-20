@@ -8,6 +8,7 @@ from screenshot import capture_around
 from uia import get_element_info
 from ocr import extract_text
 from logger import log_call, log
+import metrics
 from settings import UIA_THRESHOLD
 
 
@@ -120,6 +121,7 @@ def describe_under_cursor(x: int | None = None, y: int | None = None) -> Dict:
     else:
         chosen = ocr_text
         source = "ocr"
+        metrics.record_fallback("used_ocr")
     return {
         "cursor": pos,
         "app": app,
