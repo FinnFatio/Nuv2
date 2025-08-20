@@ -28,6 +28,15 @@ python screenshot.py --json --window "janela_que_nao_existe" erro.png
 
 Para detalhes completos de configuração, uso da CLI e API, consulte [docs/usage.md](docs/usage.md).
 
+<a id="log-config"></a>
+## Configurações de log
+
+| Variável | Descrição | Exemplo |
+|---------|-----------|---------|
+| `LOG_FORMAT` | formato dos logs (`text` ou `json`) | `json` |
+| `LOG_LEVEL` | nível mínimo de log (`debug`, `info`, `warning`, `error`, `critical`) | `debug` |
+| `LOG_RATE_LIMIT_HZ` | limite de frequência de logs por segundo | `2` |
+
 ## Módulos
 
 - `cursor.py`: posição atual do cursor.

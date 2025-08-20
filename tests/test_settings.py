@@ -57,11 +57,14 @@ def test_capture_log_dest_fallback(monkeypatch, capsys):
     def fake_mkdir(self, *args, **kwargs):
         raise PermissionError
 
-    monkeypatch.setenv("CAPTURE_LOG_DEST", "file:some/path/log.txt")
+    monkeypatch.setenv(
+        "CAPTURE_LOG_DEST", "file:nonexistent/dir/log.txt"
+    )
     monkeypatch.setenv("LOG_FORMAT", "json")
     monkeypatch.setenv("LOG_LEVEL", "debug")
     monkeypatch.setattr(Path, "mkdir", fake_mkdir)
     importlib.reload(settings)
     err = capsys.readouterr().err
     assert "CAPTURE_LOG_DEST" in err
+    assert "not writable" in err
     assert settings.CAPTURE_LOG_DEST == "stderr"

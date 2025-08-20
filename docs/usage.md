@@ -14,6 +14,10 @@ Opções podem ser fornecidas via variáveis de ambiente, arquivo `.env` ou arqu
 - `CAPTURE_LOG_DEST` – destino dos logs de captura (`stderr` ou `file:caminho`)
 - `LOG_LEVEL` – nível global de log (`debug`, `info`, `warning`; padrão: `info`)
 - `LOG_FORMAT` – formato dos logs (`text` ou `json`; padrão: `text`)
+- `LOG_RATE_LIMIT_HZ` – limite de frequência dos logs por segundo (padrão: desativado)
+
+Consulte a [tabela de configurações de log](../README.md#log-config) para exemplos de
+`LOG_FORMAT`, `LOG_LEVEL` e `LOG_RATE_LIMIT_HZ`.
 
 Quando `LOG_LEVEL=debug`, um digest de configuração e versão é emitido no início da execução.
 
