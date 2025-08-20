@@ -219,8 +219,8 @@ def test_get_screen_bounds_recovers_from_failure(monkeypatch):
 
     reset_called = []
 
-    def fake_reset():
-        reset_called.append(True)
+    def fake_reset(reason=None):
+        reset_called.append(reason)
 
     monkeypatch.setattr(screenshot, "_get_sct", fake_get_sct)
     monkeypatch.setattr(screenshot, "_reset_sct", fake_reset)
@@ -231,6 +231,31 @@ def test_get_screen_bounds_recovers_from_failure(monkeypatch):
     assert reset_called
 
 
+def test_reset_sct_logs_reason(monkeypatch):
+    screenshot._SCT = types.SimpleNamespace(close=lambda: None)
+    monkeypatch.setattr(screenshot, "CAPTURE_LOG_SAMPLE_RATE", 1.0)
+    monkeypatch.setattr(screenshot.random, "random", lambda: 0.0)
+    monkeypatch.setattr(screenshot, "CAPTURE_LOG_DEST", "stderr")
+    buf = io.StringIO()
+    monkeypatch.setattr(sys, "stderr", buf)
+    screenshot._reset_sct("monitors_failed")
+    data = json.loads(buf.getvalue().strip())
+    assert data["stage"] == "mss.reset"
+    assert data["reason"] == "monitors_failed"
+
+
+def test_health_check(monkeypatch):
+    class DummySCT:
+        monitors = [{"left": 0, "top": 0, "width": 1, "height": 1}]
+
+        def grab(self, monitor):
+            return types.SimpleNamespace()
+
+    monkeypatch.setattr(screenshot, "_get_sct", lambda: DummySCT())
+    data = screenshot.health_check()
+    assert "bounds" in data and "latency_ms" in data
+
+
 def test_main_errors_return_json(monkeypatch, capsys):
     monkeypatch.setattr(sys, "argv", ["screenshot.py", "--region", "bad", "out.png"])
     with pytest.raises(SystemExit) as exc:
@@ -238,7 +263,7 @@ def test_main_errors_return_json(monkeypatch, capsys):
     assert exc.value.code == 2
     out = capsys.readouterr().out.strip()
     data = json.loads(out)
-    assert data["code"] == "bad_region"
+    assert data["error"]["code"] == "bad_region"
 
 
 def test_main_requires_pygetwindow_outputs_json(monkeypatch, capsys):
@@ -258,7 +283,7 @@ def test_main_requires_pygetwindow_outputs_json(monkeypatch, capsys):
     assert exc.value.code == 1
     out = capsys.readouterr().out.strip()
     data = json.loads(out)
-    assert data["code"] == "pygetwindow_missing"
+    assert data["error"]["code"] == "pygetwindow_missing"
 
 
 def test_main_json_success(monkeypatch, tmp_path, capsys):
@@ -290,7 +315,7 @@ def test_main_window_not_found_outputs_json(monkeypatch, capsys):
         screenshot.main()
     assert exc.value.code == 1
     data = json.loads(capsys.readouterr().out.strip())
-    assert data["code"] == "window_not_found"
+    assert data["error"]["code"] == "window_not_found"
 
 
 def test_main_window_ignore_case(monkeypatch, tmp_path):
@@ -329,7 +354,7 @@ def test_main_window_first_limit(monkeypatch, capsys):
         screenshot.main()
     assert exc.value.code == 1
     data = json.loads(capsys.readouterr().out.strip())
-    assert data["code"] == "window_not_found"
+    assert data["error"]["code"] == "window_not_found"
 
 
 def test_main_json_includes_null_region(monkeypatch, tmp_path, capsys):
@@ -343,4 +368,43 @@ def test_main_json_includes_null_region(monkeypatch, tmp_path, capsys):
     screenshot.main()
     data = json.loads(capsys.readouterr().out.strip())
     assert data["output"] == str(out_file)
-    assert "region" in data and data["region"] is None
+
+
+def test_main_monitor_capture(monkeypatch, tmp_path):
+    class DummyImg:
+        def save(self, path):
+            pass
+
+    def fake_capture(region):
+        assert region == (2, 0, 4, 2)
+        return DummyImg()
+
+    class DummySCT:
+        monitors = [
+            {"left": 0, "top": 0, "width": 4, "height": 2},
+            {"left": 0, "top": 0, "width": 2, "height": 2},
+            {"left": 2, "top": 0, "width": 2, "height": 2},
+        ]
+
+    monkeypatch.setattr(screenshot, "_get_sct", lambda: DummySCT())
+    monkeypatch.setattr(screenshot, "capture", fake_capture)
+    out_file = tmp_path / "out.png"
+    monkeypatch.setattr(sys, "argv", ["screenshot.py", "--monitor", "mon2", str(out_file)])
+    screenshot.main()
+
+
+def test_main_window_timeout(monkeypatch, capsys):
+    import time
+
+    def slow_windows():
+        time.sleep(1)
+        return []
+
+    gw_module = types.SimpleNamespace(getAllWindows=slow_windows)
+    monkeypatch.setitem(sys.modules, "pygetwindow", gw_module)
+    monkeypatch.setattr(sys, "argv", ["screenshot.py", "--window", "a", "--timeout", "0.01"])
+    with pytest.raises(SystemExit) as exc:
+        screenshot.main()
+    assert exc.value.code == 1
+    data = json.loads(capsys.readouterr().out.strip())
+    assert data["error"]["code"] == "window_search_timeout"

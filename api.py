@@ -7,20 +7,88 @@ if "" in sys.path:
     sys.path.remove("")
     sys.path.append("")
 import fastapi
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Request
 from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
+from collections import defaultdict, deque
+import time
 import resolve
 import screenshot
-from logger import setup, log_call
+from screenshot import ERROR_CODE_MAP
+from logger import setup, log_call, REQUEST_ID, COMPONENT
+import metrics
+import uuid
+from settings import (
+    SNAPSHOT_MAX_AREA,
+    SNAPSHOT_MAX_SIDE,
+    API_RATE_LIMIT_PER_MIN,
+    API_CORS_ORIGINS,
+)
 
 # Enable JSON logging similar to CLI tools
-setup(True)
+setup(enable=True, jsonl=True)
+COMPONENT.set("api")
 
 app = FastAPI()
+
+if API_CORS_ORIGINS:
+    origins = [o.strip() for o in API_CORS_ORIGINS.split(",") if o.strip()]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+API_VERSION = "v1"
+
+
+def ok_response(data: Dict, status_code: int = 200) -> JSONResponse:
+    return JSONResponse(
+        {"ok": True, "data": data, "meta": {"version": API_VERSION}},
+        status_code=status_code,
+    )
+
+
+def error_response(code: str, message: str, status_code: int) -> JSONResponse:
+    return JSONResponse(
+        {
+            "ok": False,
+            "error": {"code": code, "message": message},
+            "meta": {"version": API_VERSION},
+        },
+        status_code=status_code,
+    )
+
 
 # Caches for element details and bounds keyed by IDs
 ELEMENT_CACHE: Dict[str, Dict] = {}
 BOUNDS_CACHE: Dict[str, Dict] = {}
+
+_REQUEST_LOG: Dict[str, deque] = defaultdict(deque)
+
+
+@app.middleware("http")
+async def add_request_id_and_rate_limit(request: Request, call_next):
+    request_id = uuid.uuid4().hex
+    REQUEST_ID.set(request_id)
+    ip = request.client.host if request.client else "unknown"
+    now = time.time()
+    dq = _REQUEST_LOG[ip]
+    while dq and now - dq[0] > 60:
+        dq.popleft()
+    if len(dq) >= API_RATE_LIMIT_PER_MIN:
+        metrics.record_request(request.url.path, True)
+        response = error_response("rate_limit", "rate limit exceeded", 429)
+        response.headers["X-Request-Id"] = request_id
+        REQUEST_ID.set(None)
+        return response
+    dq.append(now)
+    response = await call_next(request)
+    metrics.record_request(request.url.path, response.status_code >= 400)
+    response.headers["X-Request-Id"] = request_id
+    REQUEST_ID.set(None)
+    return response
 
 
 @app.get("/inspect")
@@ -37,7 +105,7 @@ def inspect(x: int | None = Query(default=None), y: int | None = Query(default=N
     if bounds:
         BOUNDS_CACHE[info["control_id"]] = bounds
         BOUNDS_CACHE[info["window_id"]] = bounds
-    return JSONResponse(info)
+    return ok_response(info)
 
 
 @app.get("/details")
@@ -46,8 +114,8 @@ def details(id: str = Query(...)):
     """Return cached element details for the given control or window ID."""
     element = ELEMENT_CACHE.get(id)
     if not element:
-        return JSONResponse({"error": "id not found", "code": "id_not_found"}, status_code=404)
-    return JSONResponse(element)
+        return error_response("id_not_found", "id not found", 404)
+    return ok_response(element)
 
 
 @app.get("/snapshot")
@@ -55,14 +123,11 @@ def details(id: str = Query(...)):
 def snapshot(id: str | None = None, region: str | None = None):
     """Return a PNG screenshot by element ID or explicit region."""
     if (id is None) == (region is None):
-        return JSONResponse(
-            {"error": "provide id or region", "code": "missing_id_or_region"},
-            status_code=400,
-        )
+        return error_response("missing_id_or_region", "provide id or region", 400)
     if id is not None:
         bounds = BOUNDS_CACHE.get(id)
         if not bounds:
-            return JSONResponse({"error": "id not found", "code": "id_not_found"}, status_code=404)
+            return error_response("id_not_found", "id not found", 404)
         region_tuple = (
             bounds["left"],
             bounds["top"],
@@ -73,12 +138,28 @@ def snapshot(id: str | None = None, region: str | None = None):
         try:
             x, y, w, h = map(int, region.split(","))
         except Exception:
-            return JSONResponse(
-                {"error": "invalid region", "code": "invalid_region"}, status_code=400
-            )
+            return error_response("invalid_region", "invalid region", 400)
+        if w * h > SNAPSHOT_MAX_AREA or w > SNAPSHOT_MAX_SIDE or h > SNAPSHOT_MAX_SIDE:
+            return error_response("region_too_large", "region too large", 400)
         region_tuple = (x, y, x + w, y + h)
-    img = screenshot.capture(region_tuple)
+    try:
+        img = screenshot.capture(region_tuple)
+    except ValueError as e:
+        code = ERROR_CODE_MAP.get(str(e), "bad_region")
+        return error_response(code, str(e), 400)
+    except Exception as e:  # pragma: no cover - unexpected capture failure
+        code = ERROR_CODE_MAP.get(str(e), "capture_failed")
+        return error_response(code, str(e), 500)
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     buf.seek(0)
-    return StreamingResponse(buf, media_type="image/png")
+    resp = StreamingResponse(buf, media_type="image/png")
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+@app.get("/metrics")
+@log_call
+def get_metrics():
+    """Return aggregated latency, fallback and error information."""
+    return ok_response(metrics.summary())
