@@ -46,7 +46,7 @@ def details(id: str = Query(...)):
     """Return cached element details for the given control or window ID."""
     element = ELEMENT_CACHE.get(id)
     if not element:
-        return JSONResponse({"error": "id not found"}, status_code=404)
+        return JSONResponse({"error": "id not found", "code": "id_not_found"}, status_code=404)
     return JSONResponse(element)
 
 
@@ -55,11 +55,14 @@ def details(id: str = Query(...)):
 def snapshot(id: str | None = None, region: str | None = None):
     """Return a PNG screenshot by element ID or explicit region."""
     if (id is None) == (region is None):
-        return JSONResponse({"error": "provide id or region"}, status_code=400)
+        return JSONResponse(
+            {"error": "provide id or region", "code": "missing_id_or_region"},
+            status_code=400,
+        )
     if id is not None:
         bounds = BOUNDS_CACHE.get(id)
         if not bounds:
-            return JSONResponse({"error": "id not found"}, status_code=404)
+            return JSONResponse({"error": "id not found", "code": "id_not_found"}, status_code=404)
         region_tuple = (
             bounds["left"],
             bounds["top"],
@@ -70,7 +73,9 @@ def snapshot(id: str | None = None, region: str | None = None):
         try:
             x, y, w, h = map(int, region.split(","))
         except Exception:
-            return JSONResponse({"error": "invalid region"}, status_code=400)
+            return JSONResponse(
+                {"error": "invalid region", "code": "invalid_region"}, status_code=400
+            )
         region_tuple = (x, y, x + w, y + h)
     img = screenshot.capture(region_tuple)
     buf = io.BytesIO()

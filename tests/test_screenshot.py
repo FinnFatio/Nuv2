@@ -238,7 +238,7 @@ def test_main_errors_return_json(monkeypatch, capsys):
     assert exc.value.code == 2
     out = capsys.readouterr().out.strip()
     data = json.loads(out)
-    assert "error" in data
+    assert data["code"] == "bad_region"
 
 
 def test_main_requires_pygetwindow_outputs_json(monkeypatch, capsys):
@@ -258,7 +258,7 @@ def test_main_requires_pygetwindow_outputs_json(monkeypatch, capsys):
     assert exc.value.code == 1
     out = capsys.readouterr().out.strip()
     data = json.loads(out)
-    assert "error" in data
+    assert data["code"] == "pygetwindow_missing"
 
 
 def test_main_json_success(monkeypatch, tmp_path, capsys):
@@ -290,7 +290,46 @@ def test_main_window_not_found_outputs_json(monkeypatch, capsys):
         screenshot.main()
     assert exc.value.code == 1
     data = json.loads(capsys.readouterr().out.strip())
-    assert data["error"] == "No window matches pattern"
+    assert data["code"] == "window_not_found"
+
+
+def test_main_window_ignore_case(monkeypatch, tmp_path):
+    class DummyImg:
+        def save(self, path):
+            pass
+
+    class DummyWin:
+        title = "NotePad"
+        left = top = 0
+        width = height = 1
+
+    gw_module = types.SimpleNamespace(getAllWindows=lambda: [DummyWin()])
+    monkeypatch.setitem(sys.modules, "pygetwindow", gw_module)
+    out_file = tmp_path / "out.png"
+    monkeypatch.setattr(sys, "argv", ["screenshot.py", "--window", "notepad", str(out_file)])
+    monkeypatch.setattr(screenshot, "capture", lambda region: DummyImg())
+    screenshot.main()
+
+
+def test_main_window_first_limit(monkeypatch, capsys):
+    class WinA:
+        title = "Other"
+        left = top = 0
+        width = height = 1
+
+    class WinB:
+        title = "Target"
+        left = top = 0
+        width = height = 1
+
+    gw_module = types.SimpleNamespace(getAllWindows=lambda: [WinA(), WinB()])
+    monkeypatch.setitem(sys.modules, "pygetwindow", gw_module)
+    monkeypatch.setattr(sys, "argv", ["screenshot.py", "--window", "Target", "--first", "1"])
+    with pytest.raises(SystemExit) as exc:
+        screenshot.main()
+    assert exc.value.code == 1
+    data = json.loads(capsys.readouterr().out.strip())
+    assert data["code"] == "window_not_found"
 
 
 def test_main_json_includes_null_region(monkeypatch, tmp_path, capsys):

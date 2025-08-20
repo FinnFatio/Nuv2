@@ -41,6 +41,22 @@ Opções podem ser fornecidas via variáveis de ambiente, arquivo `.env` ou arqu
 - `UIA_THRESHOLD` – limiar de confiança para preferir texto de UIA (padrão: `0.7`)
 - `TESSERACT_CMD` – caminho para o executável do Tesseract, caso não esteja no `PATH`
 
+## Exemplos rápidos
+
+```sh
+# Capturar uma região específica
+python screenshot.py --region 0,0,100,100 regiao.png
+# => salva regiao.png
+
+# Capturar a janela ativa
+python screenshot.py --active ativa.png
+# => salva ativa.png
+
+# Emitir JSON junto da captura
+python screenshot.py --json --region 0,0,1,1 exemplo.png
+# => {"output": "exemplo.png", "region": [0, 0, 1, 1]}
+```
+
 ## Uso
 
 ```sh
