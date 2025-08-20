@@ -136,14 +136,9 @@ def load_settings() -> dict:
     import logger as _logger
 
     _logger.setup(level=cfg["LOG_LEVEL"], fmt=cfg["LOG_FORMAT"])
-    if (
-        os.getenv("NU_LOG_SETTINGS") == "1"
-        or os.getenv("DEBUG") == "1"
-        or __name__ == "__main__"
-    ):
-        _logger.get_logger().info(
-            json.dumps({"config_digest": origins, "version_stamp": version_stamp})
-        )
+    _logger.get_logger().debug(
+        json.dumps({"config_digest": origins, "version_stamp": version_stamp})
+    )
     global CONFIG_SOURCES
     CONFIG_SOURCES = origins
     return cfg

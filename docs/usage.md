@@ -14,7 +14,18 @@ Opções podem ser fornecidas via variáveis de ambiente, arquivo `.env` ou arqu
 - `CAPTURE_LOG_DEST` – destino dos logs de captura (`stderr` ou `file:caminho`)
 - `LOG_LEVEL` – nível global de log (`debug`, `info`, `warning`; padrão: `info`)
 - `LOG_FORMAT` – formato dos logs (`text` ou `json`; padrão: `text`)
-- `NU_LOG_SETTINGS` – quando `1`, emite digest de configuração e versão no início
+
+Quando `LOG_LEVEL=debug`, um digest de configuração e versão é emitido no início da execução.
+
+Exemplo de diferença entre formatos de log:
+
+```
+INFO: hello
+```
+
+```
+{"level": "INFO", "message": "hello"}
+```
 
 Exemplo de customização do logger:
 

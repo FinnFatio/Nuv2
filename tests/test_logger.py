@@ -2,6 +2,7 @@
 import importlib
 import json
 import time
+import threading
 
 import logger
 
@@ -74,3 +75,21 @@ def test_rate_limit_reset(capsys):
         logger.log("stage", start)
     out = capsys.readouterr().err.strip().splitlines()
     assert len(out) == 2
+
+
+def test_log_rate_limit_concurrent(capsys):
+    reload_logger()
+    logger.setup(enable=True, jsonl=True, rate_limit_hz=1)
+    start = time.time()
+
+    def worker():
+        logger.log("stage", start)
+
+    threads = [threading.Thread(target=worker) for _ in range(2)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    out = capsys.readouterr().err.strip().splitlines()
+    assert len(out) == 1
