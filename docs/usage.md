@@ -80,6 +80,36 @@ python screenshot.py --json --window janela_inexistente out.png
 
 ```
 
+### Formato de saída
+
+Quando `--json` é utilizado, a CLI emite exatamente uma linha de JSON na
+`stdout`:
+
+```sh
+python screenshot.py --json --region 0,0,1,1 out.png
+# => {"output":"out.png","region":[0,0,1,1]}
+```
+
+Sem região explícita, o campo `region` será `null`:
+
+```sh
+python screenshot.py --json out.png
+# => {"output":"out.png","region":null}
+```
+
+Em caso de erro, o JSON contém um objeto `error`:
+
+```sh
+python screenshot.py --json --region 0,0,-1,1 out.png
+# => {"error":{"code":"bad_region","message":"Invalid capture region (0,0,-1,1)"}}
+```
+
+### Códigos de saída
+
+- `0` – sucesso
+- `1` – erro operacional (ex.: `window_not_found`)
+- `2` – região inválida
+
 ### Códigos de erro da CLI
 
 | Código               | Descrição exemplo                      |

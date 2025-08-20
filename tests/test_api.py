@@ -200,3 +200,32 @@ def test_rate_limit(monkeypatch):
     data = resp.json()
     assert data["error"]["code"] == "rate_limit"
 
+
+def test_inspect_tesseract_error(monkeypatch):
+    api.ELEMENT_CACHE.clear()
+    api.BOUNDS_CACHE.clear()
+
+    def fake_get_position():
+        return {"x": 0, "y": 0}
+
+    def fake_element_info(x, y):
+        return ({}, {"bounds": {}}, "", 0.0)
+
+    def fake_capture_around(pos, bounds=None):
+        return ("img", None)
+
+    def raise_ocr(img):  # pragma: no cover - error path
+        raise RuntimeError("tesseract_failed")
+
+    monkeypatch.setattr(api.resolve, "get_position", fake_get_position)
+    monkeypatch.setattr(api.resolve, "get_element_info", fake_element_info)
+    monkeypatch.setattr(api.resolve, "capture_around", fake_capture_around)
+    monkeypatch.setattr(api.resolve, "extract_text", raise_ocr)
+
+    client = TestClient(api.app)
+    resp = client.get("/inspect")
+    assert resp.status_code == 200
+    assert (
+        resp.json()["data"]["errors"]["extract_text"] == "tesseract_failed"
+    )
+

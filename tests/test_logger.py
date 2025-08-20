@@ -3,6 +3,8 @@ import importlib
 import json
 import time
 import threading
+import logging
+import pytest
 
 import logger
 
@@ -93,3 +95,17 @@ def test_log_rate_limit_concurrent(capsys):
 
     out = capsys.readouterr().err.strip().splitlines()
     assert len(out) == 1
+
+
+def test_env_overridden_by_params(monkeypatch, capsys):
+    reload_logger()
+    monkeypatch.setenv("LOG_LEVEL", "WARNING")
+    monkeypatch.setenv("LOG_FORMAT", "text")
+    monkeypatch.setenv("LOG_RATE_LIMIT_HZ", "1")
+    logger.setup(enable=True, jsonl=True, level="DEBUG", fmt="json", rate_limit_hz=5)
+    logger.get_logger().debug("dbg")
+    out = capsys.readouterr().err.strip()
+    data = json.loads(out)
+    assert logger.RATE_LIMIT_INTERVAL == pytest.approx(0.2)
+    assert logger.get_logger().level == logging.DEBUG
+    assert data["message"] == "dbg"
