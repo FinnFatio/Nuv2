@@ -1,3 +1,4 @@
+import importlib
 import json
 
 import settings
@@ -28,11 +29,23 @@ def test_load_settings_priority_and_invalid(monkeypatch, tmp_path, capsys):
     assert "Invalid CAPTURE_LOG_SAMPLE_RATE" in err
 
 
-def test_version_stamp_in_config_digest(capsys):
-    import importlib
-
+def test_version_stamp_in_config_digest(monkeypatch, capsys):
+    monkeypatch.setenv("LOG_FORMAT", "json")
     importlib.reload(settings)
     out = capsys.readouterr().err.strip()
     data = json.loads(out)
     assert "version_stamp" in data
     assert "python" in data["version_stamp"]
+
+
+def test_log_level_env(monkeypatch, capsys):
+    monkeypatch.setenv("LOG_LEVEL", "warning")
+    monkeypatch.setenv("LOG_FORMAT", "json")
+    importlib.reload(settings)
+    import logger
+
+    logger.get_logger().info("info")
+    logger.get_logger().warning("warn")
+    out = capsys.readouterr().err.strip().splitlines()
+    assert len(out) == 1
+    assert json.loads(out[0])["message"] == "warn"

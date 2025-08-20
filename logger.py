@@ -12,24 +12,46 @@ LOGGER = logging.getLogger("nuv2")
 LOGGER.addHandler(logging.NullHandler())
 
 
+class JsonFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:  # pragma: no cover - simple
+        base = {"level": record.levelname}
+        try:
+            data = json.loads(record.getMessage())
+            if isinstance(data, dict):
+                base.update(data)
+            else:
+                base["message"] = data
+        except Exception:  # pragma: no cover - fallback
+            base["message"] = record.getMessage()
+        return json.dumps(base)
+
+
 def get_logger() -> logging.Logger:
     """Return the shared logger instance."""
     return LOGGER
 
 
-def setup(jsonl: bool = False, rate_limit_hz: float | None = None) -> logging.Logger:
+def setup(
+    enable: bool = False,
+    rate_limit_hz: float | None = None,
+    level: str = "INFO",
+    fmt: str = "text",
+) -> logging.Logger:
     """Configure logging and return the shared logger."""
     global ENABLED, RATE_LIMIT_INTERVAL, _LAST_LOG_TIME
-    ENABLED = jsonl
+    ENABLED = enable
     LOGGER.handlers.clear()
     LOGGER.propagate = False
-    if jsonl:
-        handler = logging.StreamHandler()
-        handler.setFormatter(logging.Formatter("%(message)s"))
-        LOGGER.addHandler(handler)
-        LOGGER.setLevel(logging.INFO)
+    handler = logging.StreamHandler()
+    if fmt == "json":
+        handler.setFormatter(JsonFormatter())
     else:
-        LOGGER.addHandler(logging.NullHandler())
+        handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
+    LOGGER.addHandler(handler)
+    try:
+        LOGGER.setLevel(getattr(logging, level.upper()))
+    except Exception:  # pragma: no cover - invalid level
+        LOGGER.setLevel(logging.INFO)
     if rate_limit_hz and rate_limit_hz > 0:
         RATE_LIMIT_INTERVAL = 1.0 / rate_limit_hz
     else:
