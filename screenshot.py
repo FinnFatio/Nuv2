@@ -22,6 +22,7 @@ from settings import (
 )
 from logger import log_call, setup, COMPONENT
 from cli import emit_cli_json
+import metrics
 
 ERROR_CODE_MAP = {
     "pygetwindow is required for window capture": "pygetwindow_missing",
@@ -48,6 +49,7 @@ def _log_sampled(data: Dict[str, object]) -> None:
 
 
 def _reset_sct(reason: str | None = None) -> None:
+    metrics.record_fallback("resets")
     if reason is not None:
         _log_sampled({"stage": "mss.reset", "reason": reason})
     global _SCT

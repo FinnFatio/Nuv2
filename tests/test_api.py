@@ -186,6 +186,16 @@ def test_snapshot_region_too_large(monkeypatch):
     assert resp.json()["error"]["code"] == "region_too_large"
 
 
+def test_healthz_endpoint(monkeypatch):
+    api.ELEMENT_CACHE.clear()
+    api.BOUNDS_CACHE.clear()
+    monkeypatch.setattr(api.screenshot, "health_check", lambda: {"ok": True})
+    client = TestClient(api.app)
+    resp = client.get("/healthz")
+    assert resp.status_code == 200
+    assert resp.json()["data"] == {"ok": True}
+
+
 def test_rate_limit(monkeypatch):
     api.ELEMENT_CACHE.clear()
     api.BOUNDS_CACHE.clear()

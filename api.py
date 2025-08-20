@@ -158,6 +158,13 @@ def snapshot(id: str | None = None, region: str | None = None):
     return resp
 
 
+@app.get("/healthz")
+@log_call
+def healthz():
+    """Return basic screenshot health information."""
+    return ok_response(screenshot.health_check())
+
+
 @app.get("/metrics")
 @log_call
 def get_metrics():

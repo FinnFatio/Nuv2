@@ -58,6 +58,7 @@ def summary() -> Dict:
         "latency_ms": latency,
         "fallbacks": dict(_fallbacks),
         "error_rate": error_rate,
+        "resets_total": _fallbacks.get("resets", 0),
     }
 
 
