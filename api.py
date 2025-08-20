@@ -7,20 +7,53 @@ if "" in sys.path:
     sys.path.remove("")
     sys.path.append("")
 import fastapi
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 import resolve
 import screenshot
-from logger import setup, log_call
+from logger import setup, log_call, REQUEST_ID, COMPONENT
+import uuid
 
 # Enable JSON logging similar to CLI tools
-setup(True)
+setup(enable=True, jsonl=True)
+COMPONENT.set("api")
 
 app = FastAPI()
+
+API_VERSION = "v1"
+
+
+def ok_response(data: Dict, status_code: int = 200) -> JSONResponse:
+    return JSONResponse(
+        {"ok": True, "data": data, "meta": {"version": API_VERSION}},
+        status_code=status_code,
+    )
+
+
+def error_response(code: str, message: str, status_code: int) -> JSONResponse:
+    return JSONResponse(
+        {
+            "ok": False,
+            "error": {"code": code, "message": message},
+            "meta": {"version": API_VERSION},
+        },
+        status_code=status_code,
+    )
+
 
 # Caches for element details and bounds keyed by IDs
 ELEMENT_CACHE: Dict[str, Dict] = {}
 BOUNDS_CACHE: Dict[str, Dict] = {}
+
+
+@app.middleware("http")
+async def add_request_id(request: Request, call_next):
+    request_id = uuid.uuid4().hex
+    REQUEST_ID.set(request_id)
+    response = await call_next(request)
+    response.headers["X-Request-Id"] = request_id
+    REQUEST_ID.set(None)
+    return response
 
 
 @app.get("/inspect")
@@ -37,7 +70,7 @@ def inspect(x: int | None = Query(default=None), y: int | None = Query(default=N
     if bounds:
         BOUNDS_CACHE[info["control_id"]] = bounds
         BOUNDS_CACHE[info["window_id"]] = bounds
-    return JSONResponse(info)
+    return ok_response(info)
 
 
 @app.get("/details")
@@ -46,8 +79,8 @@ def details(id: str = Query(...)):
     """Return cached element details for the given control or window ID."""
     element = ELEMENT_CACHE.get(id)
     if not element:
-        return JSONResponse({"error": "id not found", "code": "id_not_found"}, status_code=404)
-    return JSONResponse(element)
+        return error_response("id_not_found", "id not found", 404)
+    return ok_response(element)
 
 
 @app.get("/snapshot")
@@ -55,14 +88,11 @@ def details(id: str = Query(...)):
 def snapshot(id: str | None = None, region: str | None = None):
     """Return a PNG screenshot by element ID or explicit region."""
     if (id is None) == (region is None):
-        return JSONResponse(
-            {"error": "provide id or region", "code": "missing_id_or_region"},
-            status_code=400,
-        )
+        return error_response("missing_id_or_region", "provide id or region", 400)
     if id is not None:
         bounds = BOUNDS_CACHE.get(id)
         if not bounds:
-            return JSONResponse({"error": "id not found", "code": "id_not_found"}, status_code=404)
+            return error_response("id_not_found", "id not found", 404)
         region_tuple = (
             bounds["left"],
             bounds["top"],
@@ -73,12 +103,12 @@ def snapshot(id: str | None = None, region: str | None = None):
         try:
             x, y, w, h = map(int, region.split(","))
         except Exception:
-            return JSONResponse(
-                {"error": "invalid region", "code": "invalid_region"}, status_code=400
-            )
+            return error_response("invalid_region", "invalid region", 400)
         region_tuple = (x, y, x + w, y + h)
     img = screenshot.capture(region_tuple)
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     buf.seek(0)
-    return StreamingResponse(buf, media_type="image/png")
+    resp = StreamingResponse(buf, media_type="image/png")
+    resp.headers["Cache-Control"] = "no-store"
+    return resp

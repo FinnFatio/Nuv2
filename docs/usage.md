@@ -73,6 +73,17 @@ Um ciclo típico de automação é **observe → plan → act → verify**:
 
 As respostas e logs seguem a mesma estrutura JSON das ferramentas de linha de comando.
 
+### Códigos de erro
+
+| Código              | Descrição exemplo                      |
+|---------------------|----------------------------------------|
+| `id_not_found`      | ID não encontrado                       |
+| `missing_id_or_region` | Parâmetros `id` ou `region` ausentes |
+| `invalid_region`    | Região inválida                         |
+| `pygetwindow_missing` | pygetwindow ausente para captura       |
+| `no_active_window`  | Nenhuma janela ativa                    |
+| `window_not_found`  | Nenhuma janela corresponde ao padrão    |
+
 ## Próximos Passos
 
 Pretende-se disponibilizar um endpoint `POST /act` que permita simular ações antes de executá-las, reforçando a segurança e a validação das interações automatizadas. Essa camada de simulação garante que apenas comandos aprovados sejam aplicados ao sistema real. A documentação será expandida assim que o endpoint estiver disponível.
