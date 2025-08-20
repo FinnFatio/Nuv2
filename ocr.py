@@ -5,11 +5,14 @@ from logger import log_call
 from settings import OCR_LANG, OCR_CFG, TESSERACT_CMD
 from pathlib import Path
 import shutil
+import os
 
 
 if TESSERACT_CMD:
     cmd = Path(TESSERACT_CMD)
-    if cmd.is_file() or shutil.which(str(cmd)):
+    if cmd.is_file() and os.access(cmd, os.X_OK):
+        pytesseract.pytesseract.tesseract_cmd = str(cmd)
+    elif shutil.which(str(cmd)):
         pytesseract.pytesseract.tesseract_cmd = str(cmd)
     else:
         raise RuntimeError("tesseract_missing")
@@ -27,6 +30,8 @@ def extract_text(image: Image) -> Tuple[str, float]:
         )
     except FileNotFoundError as e:
         raise RuntimeError("tesseract_missing") from e
+    except pytesseract.TesseractError as e:
+        raise RuntimeError("tesseract_failed") from e
     words = [w for w in data["text"] if w.strip()]
     confidences = [float(c) for c in data["conf"] if c != "-1"]
     text = " ".join(words).strip()

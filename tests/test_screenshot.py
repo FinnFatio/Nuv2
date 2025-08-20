@@ -298,7 +298,9 @@ def test_main_json_success(monkeypatch, tmp_path, capsys):
         "argv",
         ["screenshot.py", "--json", "--region", "0,0,1,1", str(out_file)],
     )
-    screenshot.main()
+    with pytest.raises(SystemExit) as exc:
+        screenshot.main()
+    assert exc.value.code == 0
     out = json.loads(capsys.readouterr().out.strip())
     assert out["output"] == str(out_file)
     assert out["region"] == [0, 0, 1, 1]
@@ -365,9 +367,12 @@ def test_main_json_includes_null_region(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(screenshot, "capture", lambda region: DummyImg())
     out_file = tmp_path / "out.png"
     monkeypatch.setattr(sys, "argv", ["screenshot.py", "--json", str(out_file)])
-    screenshot.main()
+    with pytest.raises(SystemExit) as exc:
+        screenshot.main()
+    assert exc.value.code == 0
     data = json.loads(capsys.readouterr().out.strip())
     assert data["output"] == str(out_file)
+    assert data["region"] is None
 
 
 def test_main_monitor_capture(monkeypatch, tmp_path):
@@ -408,3 +413,50 @@ def test_main_window_timeout(monkeypatch, capsys):
     assert exc.value.code == 1
     data = json.loads(capsys.readouterr().out.strip())
     assert data["error"]["code"] == "window_search_timeout"
+
+
+def test_cli_success_json_no_region(monkeypatch, capsys, tmp_path):
+    class DummyImg:
+        def save(self, path):
+            pass
+
+    monkeypatch.setattr(screenshot, "capture", lambda region: DummyImg())
+    out_file = tmp_path / "out.png"
+    monkeypatch.setattr(sys, "argv", ["screenshot.py", "--json", str(out_file)])
+    with pytest.raises(SystemExit) as exc:
+        screenshot.main()
+    assert exc.value.code == 0
+    data = json.loads(capsys.readouterr().out.strip())
+    assert data["region"] is None
+
+
+def test_cli_window_no_match(monkeypatch, capsys, tmp_path):
+    dummy_gw = types.SimpleNamespace()
+    monkeypatch.setitem(sys.modules, "pygetwindow", dummy_gw)
+    monkeypatch.setattr(screenshot, "_get_windows", lambda gw, t: [])
+    out_file = tmp_path / "out.png"
+    monkeypatch.setattr(sys, "argv", ["screenshot.py", "--json", "--window", "nope", str(out_file)])
+    with pytest.raises(SystemExit) as exc:
+        screenshot.main()
+    assert exc.value.code == 1
+    data = json.loads(capsys.readouterr().out.strip())
+    assert data["error"]["code"] == "window_not_found"
+
+
+def test_cli_invalid_region(monkeypatch, capsys, tmp_path):
+    class DummyImg:
+        def save(self, path):
+            pass
+
+    def fake_capture(region):
+        screenshot._validate_bbox(*region)
+        return DummyImg()
+
+    monkeypatch.setattr(screenshot, "capture", fake_capture)
+    out_file = tmp_path / "out.png"
+    monkeypatch.setattr(sys, "argv", ["screenshot.py", "--json", "--region", "0,0,-1,-1", str(out_file)])
+    with pytest.raises(SystemExit) as exc:
+        screenshot.main()
+    assert exc.value.code == 2
+    data = json.loads(capsys.readouterr().out.strip())
+    assert data["error"]["code"] == "bad_region"
