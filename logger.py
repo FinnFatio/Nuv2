@@ -61,29 +61,43 @@ def get_logger() -> logging.Logger:
 def setup(
     enable: bool = False,
     rate_limit_hz: float | None = None,
-    level: str = "INFO",
+    level: str | None = None,
     jsonl: bool | None = None,
     fmt: str | None = None,
 ) -> logging.Logger:
-    """Configure logging and return the shared logger."""
+    """Configure logging and return the shared logger.
+
+    Environment variables provide defaults but are overridden by explicit
+    parameters. This allows CLI flags to take precedence over ``LOG_LEVEL``,
+    ``LOG_FORMAT`` and ``LOG_RATE_LIMIT_HZ`` when present.
+    """
+
     global ENABLED, RATE_LIMIT_INTERVAL, _LAST_LOG_TIME
     ENABLED = enable
     LOGGER.handlers.clear()
     LOGGER.propagate = False
     handler = logging.StreamHandler()
 
-    # Determine format: explicit fmt overrides jsonl flag
+    env_level = os.getenv("LOG_LEVEL")
+    env_format = os.getenv("LOG_FORMAT")
+    env_rate = os.getenv("LOG_RATE_LIMIT_HZ")
+
+    if level is None:
+        level = env_level or "INFO"
     if fmt is None:
-        fmt = "json" if jsonl else "text"
+        fmt = env_format or ("json" if jsonl else "text")
+    if rate_limit_hz is None and env_rate:
+        try:
+            rate_limit_hz = float(env_rate)
+        except ValueError:  # pragma: no cover - invalid env
+            pass
+
     if fmt == "json":
         handler.setFormatter(JsonFormatter())
     else:
         handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
     LOGGER.addHandler(handler)
 
-    env_level = os.getenv("LOG_LEVEL")
-    if env_level:
-        level = env_level
     try:
         LOGGER.setLevel(getattr(logging, level.upper()))
     except Exception:  # pragma: no cover - invalid level

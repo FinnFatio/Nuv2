@@ -253,7 +253,28 @@ def test_health_check(monkeypatch):
 
     monkeypatch.setattr(screenshot, "_get_sct", lambda: DummySCT())
     data = screenshot.health_check()
-    assert "bounds" in data and "latency_ms" in data
+    assert set(data.keys()) == {"bounds", "latency_ms"}
+    bounds = data["bounds"]
+    assert {"left", "top", "right", "bottom"} <= bounds.keys()
+    assert isinstance(data["latency_ms"], int)
+    assert data["latency_ms"] >= 0
+
+
+def test_main_negative_region_exit_code(monkeypatch, capsys):
+    def bad_capture(region):
+        raise ValueError("Invalid capture region")
+
+    monkeypatch.setattr(screenshot, "capture", bad_capture)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["screenshot.py", "--json", "--region", "0,0,-1,1", "out.png"],
+    )
+    with pytest.raises(SystemExit) as exc:
+        screenshot.main()
+    assert exc.value.code == 2
+    data = json.loads(capsys.readouterr().out.strip())
+    assert data["error"]["code"] == "bad_region"
 
 
 def test_main_errors_return_json(monkeypatch, capsys):
