@@ -6,6 +6,7 @@ import uuid
 from functools import wraps
 import contextvars
 import threading
+from typing import Callable, ParamSpec, TypeVar
 
 import metrics
 
@@ -152,10 +153,15 @@ def log(
     LOGGER.log(lvl, json.dumps(data))
 
 
-def log_call(func):
+P = ParamSpec("P")
+T = TypeVar("T")
+
+
+def log_call(func: Callable[P, T]) -> Callable[P, T]:
     """Decorator to log function start, end and errors."""
+
     @wraps(func)
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
         start = time.time()
         log(f"{func.__name__}.start", start)
         try:

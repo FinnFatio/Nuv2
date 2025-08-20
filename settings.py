@@ -1,13 +1,15 @@
 import json
 import os
-import sys
 import platform
+import sys
 from pathlib import Path
+from typing import Any
+
 import mss
 import PIL
-import pytesseract
+import pytesseract  # type: ignore[import-untyped]
 
-DEFAULTS = {
+DEFAULTS: dict[str, Any] = {
     "OCR_LANG": "por+eng",
     "OCR_CFG": "--oem 3 --psm 6",
     "CAPTURE_WIDTH": 300,
@@ -24,11 +26,11 @@ DEFAULTS = {
     "API_CORS_ORIGINS": "",
 }
 
-CONFIG_SOURCES = {}
+CONFIG_SOURCES: dict[str, str] = {}
 
 
-def _load_env_file(path: Path) -> dict:
-    data = {}
+def _load_env_file(path: Path) -> dict[str, str]:
+    data: dict[str, str] = {}
     for line in path.read_text().splitlines():
         line = line.strip()
         if not line or line.startswith("#") or "=" not in line:
@@ -38,9 +40,9 @@ def _load_env_file(path: Path) -> dict:
     return data
 
 
-def load_settings() -> dict:
-    cfg = DEFAULTS.copy()
-    origins = {key: "default" for key in DEFAULTS}
+def load_settings() -> dict[str, Any]:
+    cfg: dict[str, Any] = DEFAULTS.copy()
+    origins: dict[str, str] = {key: "default" for key in DEFAULTS}
     json_path = Path("config.json")
     if json_path.exists():
         try:
@@ -125,7 +127,9 @@ def load_settings() -> dict:
                 file=sys.stderr,
             )
             cfg["CAPTURE_LOG_DEST"] = "stderr"
-            origins["CAPTURE_LOG_DEST"] = "env" if "CAPTURE_LOG_DEST" in os.environ else "default"
+            origins["CAPTURE_LOG_DEST"] = (
+                "env" if "CAPTURE_LOG_DEST" in os.environ else "default"
+            )
 
     version_stamp = {
         "python": platform.python_version(),

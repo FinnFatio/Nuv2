@@ -10,8 +10,6 @@ def emit_cli_json(data: Dict[str, Any], code: int) -> None:
     only the emitted JSON line. Any logging should go to stderr via the standard
     :mod:`logging` module.
     """
-    sys.stdout.write(
-        json.dumps(data, separators=(",", ":"), ensure_ascii=False) + "\n"
-    )
+    sys.stdout.write(json.dumps(data, separators=(",", ":"), ensure_ascii=False) + "\n")
     sys.stdout.flush()
     raise SystemExit(code)
