@@ -30,3 +30,14 @@ screenshot.main()
     assert json.loads(result.stdout) == {"output": str(out), "region": [0, 0, 1, 1]}
     assert '"stage": "test"' in result.stderr
 
+
+def test_emit_cli_json_utf8():
+    script = (
+        "import cli\n"
+        "cli.emit_cli_json({'janela': 'café'}, 0)\n"
+    )
+    result = subprocess.run([sys.executable, "-c", script], capture_output=True)
+    assert result.returncode == 0
+    expected = json.dumps({"janela": "café"}, separators=(",", ":"), ensure_ascii=False) + "\n"
+    assert result.stdout.decode("utf-8") == expected
+
