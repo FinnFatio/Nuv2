@@ -22,8 +22,14 @@ def main(argv=None):
         ctypes.windll.user32.SetProcessDPIAware()
     except AttributeError:
         pass
-    result = describe_under_cursor()
-    emit_cli_json(result, 0)
+
+    try:
+        result = describe_under_cursor()
+    except Exception as e:
+        data = {"error": {"code": str(e), "message": str(e)}}
+        emit_cli_json(data, 1)
+    else:
+        emit_cli_json(result, 0)
 
 
 if __name__ == "__main__":
