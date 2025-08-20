@@ -1,9 +1,9 @@
 import argparse
-import json
 import ctypes
 
 from resolve import describe_under_cursor
 from logger import setup
+from cli import emit_cli_json
 
 
 def main(argv=None):
@@ -23,7 +23,7 @@ def main(argv=None):
     except AttributeError:
         pass
     result = describe_under_cursor()
-    print(json.dumps(result, indent=2, ensure_ascii=False))
+    emit_cli_json(result, 0)
 
 
 if __name__ == "__main__":

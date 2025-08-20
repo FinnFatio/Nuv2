@@ -21,6 +21,7 @@ from settings import (
     CAPTURE_LOG_DEST,
 )
 from logger import log_call
+from cli import emit_cli_json
 
 ERROR_CODE_MAP = {
     "pygetwindow is required for window capture": "pygetwindow_missing",
@@ -352,21 +353,19 @@ def main() -> None:
         data = {"error": {"code": "bad_region", "message": str(e)}}
         if region is not None:
             data["region"] = region
-        print(json.dumps(data))
-        sys.exit(2)
+        emit_cli_json(data, 2)
     except SystemExit as e:  # standardize CLI errors as JSON
         msg = str(e)
         data = {"error": {"code": ERROR_CODE_MAP.get(msg, "unknown"), "message": msg}}
-        print(json.dumps(data))
         code = e.code if isinstance(e.code, int) else 1
-        sys.exit(code)
+        emit_cli_json(data, code)
 
     out_path = Path(args.output)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     img.save(out_path)
     if args.json:
         result = {"output": str(out_path), "region": region}
-        print(json.dumps(result))
+        emit_cli_json(result, 0)
 
 
 if __name__ == "__main__":  # pragma: no cover - CLI entry point

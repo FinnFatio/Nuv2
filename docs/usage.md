@@ -77,13 +77,36 @@ Exemplo de erro mapeado:
 ```sh
 python screenshot.py --json --window janela_inexistente out.png
 # => {"error": {"code": "window_not_found", "message": "No window matches pattern"}}
+
 ```
+
+### Códigos de erro da CLI
+
+| Código               | Descrição exemplo                      |
+|----------------------|----------------------------------------|
+| `bad_region`         | Região inválida na CLI                 |
+| `pygetwindow_missing`| pygetwindow ausente para captura       |
+| `no_active_window`   | Nenhuma janela ativa                   |
+| `window_not_found`   | Nenhuma janela corresponde ao padrão   |
+| `window_search_timeout` | Busca de janela demorou demais      |
+| `tesseract_missing`  | Binário do Tesseract ausente           |
+| `tesseract_failed`   | Erro ao executar Tesseract             |
+| `capture_failed`     | Falha inesperada na captura            |
 
 ### Instalação do Tesseract
 
 O OCR depende do [Tesseract-OCR](https://github.com/tesseract-ocr/tesseract). No Windows, baixe o instalador em
-<https://github.com/UB-Mannheim/tesseract/wiki> e adicione o diretório de instalação ao `PATH` do sistema. Caso o binário
-não esteja no `PATH`, defina `TESSERACT_CMD` apontando para o executável.
+<https://github.com/UB-Mannheim/tesseract/wiki> ou instale via Chocolatey:
+
+```sh
+choco install tesseract
+```
+
+Após a instalação, se o binário não estiver no `PATH`, defina `TESSERACT_CMD` apontando para o executável:
+
+```sh
+setx TESSERACT_CMD "C:\\Program Files\\Tesseract-OCR\\tesseract.exe"
+```
 
 ### Saúde da captura
 
@@ -137,6 +160,7 @@ As respostas e logs seguem a mesma estrutura JSON das ferramentas de linha de co
 | `rate_limit`        | Limite de requisições excedido          |
 | `bad_region`        | Região inválida na CLI                  |
 | `tesseract_missing` | Binário do Tesseract ausente            |
+| `tesseract_failed`  | Erro ao executar Tesseract              |
 | `capture_failed`    | Falha inesperada na captura             |
 
 ## Próximos Passos
