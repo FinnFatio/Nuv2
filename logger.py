@@ -8,19 +8,34 @@ ENABLED = False
 SAMPLE_ID = uuid.uuid4().hex[:8]
 RATE_LIMIT_INTERVAL = None
 _LAST_LOG_TIME = 0.0
+LOGGER = logging.getLogger("nuv2")
+LOGGER.addHandler(logging.NullHandler())
 
 
-def setup(jsonl: bool = False, rate_limit_hz: float | None = None) -> None:
-    """Configure logging if JSONL output is requested."""
+def get_logger() -> logging.Logger:
+    """Return the shared logger instance."""
+    return LOGGER
+
+
+def setup(jsonl: bool = False, rate_limit_hz: float | None = None) -> logging.Logger:
+    """Configure logging and return the shared logger."""
     global ENABLED, RATE_LIMIT_INTERVAL, _LAST_LOG_TIME
     ENABLED = jsonl
+    LOGGER.handlers.clear()
+    LOGGER.propagate = False
     if jsonl:
-        logging.basicConfig(level=logging.INFO, format="%(message)s")
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter("%(message)s"))
+        LOGGER.addHandler(handler)
+        LOGGER.setLevel(logging.INFO)
+    else:
+        LOGGER.addHandler(logging.NullHandler())
     if rate_limit_hz and rate_limit_hz > 0:
         RATE_LIMIT_INTERVAL = 1.0 / rate_limit_hz
     else:
         RATE_LIMIT_INTERVAL = None
     _LAST_LOG_TIME = 0.0
+    return LOGGER
 
 
 def log(stage: str, start: float, error: str | None = None) -> None:
@@ -34,7 +49,7 @@ def log(stage: str, start: float, error: str | None = None) -> None:
             return
         _LAST_LOG_TIME = now
     elapsed_ms = int((now - start) * 1000)
-    logging.info(
+    LOGGER.info(
         json.dumps(
             {
                 "stage": stage,
