@@ -67,12 +67,15 @@ def test_capture_around_within_bounds(monkeypatch):
 def test_capture_around_multi_monitor(monkeypatch):
     # Simulate two monitors side by side with the primary at (0,0)
     monkeypatch.setattr(screenshot, "get_screen_bounds", lambda: (-800, 0, 800, 600))
+
     def fake_get_monitor_bounds(x, y):
         if x < 0:
             return {"left": -800, "top": 0, "right": 0, "bottom": 600}
         return {"left": 0, "top": 0, "right": 800, "bottom": 600}
 
-    monkeypatch.setattr(screenshot, "get_monitor_bounds_for_point", fake_get_monitor_bounds)
+    monkeypatch.setattr(
+        screenshot, "get_monitor_bounds_for_point", fake_get_monitor_bounds
+    )
     monkeypatch.setattr(screenshot, "capture", stub_capture)
     point = {"x": -790, "y": 10}
     img, region = screenshot.capture_around(point, width=100, height=100)
@@ -135,6 +138,9 @@ def test_capture_logs_time_ms(monkeypatch):
     )
     monkeypatch.setattr(screenshot, "CAPTURE_LOG_SAMPLE_RATE", 1.0)
     monkeypatch.setattr(screenshot.random, "random", lambda: 0.0)
+    monkeypatch.setattr(
+        screenshot, "get_monitor_bounds_for_point", lambda *a, **k: {"monitor": "mon1"}
+    )
 
     buf = io.StringIO()
     monkeypatch.setattr(sys, "stderr", buf)
@@ -143,6 +149,7 @@ def test_capture_logs_time_ms(monkeypatch):
 
     data = json.loads(buf.getvalue().strip())
     assert "time_capture_ms" in data
+    assert "monitor" in data
 
 
 def test_capture_invalid_region(monkeypatch):
@@ -177,12 +184,16 @@ def test_capture_log_creates_directory(monkeypatch, tmp_path):
     monkeypatch.setattr(screenshot.random, "random", lambda: 0.0)
     path = tmp_path / "logs" / "cap.log"
     monkeypatch.setattr(screenshot, "CAPTURE_LOG_DEST", f"file:{path}")
+    monkeypatch.setattr(
+        screenshot, "get_monitor_bounds_for_point", lambda *a, **k: {"monitor": "mon1"}
+    )
 
     screenshot.capture((0, 0, 1, 1))
 
     assert path.exists()
     data = json.loads(path.read_text().strip())
     assert "time_capture_ms" in data
+    assert "monitor" in data
 
 
 def test_main_errors_return_json(monkeypatch, capsys):
@@ -193,3 +204,41 @@ def test_main_errors_return_json(monkeypatch, capsys):
     out = capsys.readouterr().out.strip()
     data = json.loads(out)
     assert "error" in data
+
+
+def test_main_requires_pygetwindow_outputs_json(monkeypatch, capsys):
+    import builtins
+
+    real_import = builtins.__import__
+
+    def fake_import(name, *args, **kwargs):
+        if name == "pygetwindow":
+            raise ImportError("missing")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    monkeypatch.setattr(sys, "argv", ["screenshot.py", "--active"])
+    with pytest.raises(SystemExit) as exc:
+        screenshot.main()
+    assert exc.value.code == 1
+    out = capsys.readouterr().out.strip()
+    data = json.loads(out)
+    assert "error" in data
+
+
+def test_main_json_success(monkeypatch, tmp_path, capsys):
+    class DummyImg:
+        def save(self, path):
+            pass
+
+    monkeypatch.setattr(screenshot, "capture", lambda region: DummyImg())
+    out_file = tmp_path / "out.png"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["screenshot.py", "--json", "--region", "0,0,1,1", str(out_file)],
+    )
+    screenshot.main()
+    out = json.loads(capsys.readouterr().out.strip())
+    assert out["output"] == str(out_file)
+    assert out["region"] == [0, 0, 1, 1]

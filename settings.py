@@ -14,6 +14,7 @@ DEFAULTS = {
     "CAPTURE_LOG_DEST": "stderr",
 }
 
+
 def _load_env_file(path: Path) -> dict:
     data = {}
     for line in path.read_text().splitlines():
@@ -24,8 +25,10 @@ def _load_env_file(path: Path) -> dict:
         data[key.strip()] = value.strip()
     return data
 
+
 def load_settings() -> dict:
     cfg = DEFAULTS.copy()
+    origins = {key: "default" for key in DEFAULTS}
     json_path = Path("config.json")
     if json_path.exists():
         try:
@@ -34,6 +37,7 @@ def load_settings() -> dict:
             for key in DEFAULTS:
                 if key in data:
                     cfg[key] = data[key]
+                    origins[key] = "json"
         except Exception:
             pass
     env_path = Path(".env")
@@ -43,11 +47,13 @@ def load_settings() -> dict:
             for key in DEFAULTS:
                 if key in env_data:
                     cfg[key] = env_data[key]
+                    origins[key] = ".env"
         except Exception:
             pass
     for key in DEFAULTS:
         if key in os.environ:
             cfg[key] = os.environ[key]
+            origins[key] = "env"
 
     for key in ("CAPTURE_WIDTH", "CAPTURE_HEIGHT"):
         try:
@@ -58,6 +64,7 @@ def load_settings() -> dict:
                 file=sys.stderr,
             )
             cfg[key] = DEFAULTS[key]
+            origins[key] = "default"
 
     for key in ("UIA_THRESHOLD", "CAPTURE_LOG_SAMPLE_RATE"):
         try:
@@ -68,9 +75,12 @@ def load_settings() -> dict:
                 file=sys.stderr,
             )
             cfg[key] = DEFAULTS[key]
+            origins[key] = "default"
 
     cfg["CAPTURE_LOG_DEST"] = str(cfg["CAPTURE_LOG_DEST"])
+    print(json.dumps({"config_digest": origins}), file=sys.stderr)
     return cfg
+
 
 CONFIG = load_settings()
 OCR_LANG = CONFIG["OCR_LANG"]

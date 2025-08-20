@@ -50,7 +50,11 @@ atexit.register(_reset_sct)
 
 
 def _validate_bbox(
-    left: int, top: int, right: int, bottom: int, bounds: Optional[Dict[str, int]] = None
+    left: int,
+    top: int,
+    right: int,
+    bottom: int,
+    bounds: Optional[Dict[str, int]] = None,
 ) -> None:
     if right <= left or bottom <= top:
         region = (left, top, right, bottom)
@@ -96,6 +100,7 @@ def capture(region: Tuple[int, int, int, int] = None) -> PILImage:
             "width": right - left,
             "height": bottom - top,
         }
+        bounds = get_monitor_bounds_for_point((left + right) // 2, (top + bottom) // 2)
     else:
         try:
             monitor = sct.monitors[0]
@@ -103,6 +108,7 @@ def capture(region: Tuple[int, int, int, int] = None) -> PILImage:
             _reset_sct()
             sct = _get_sct()
             monitor = sct.monitors[0]
+        bounds = {"monitor": "virtual"}
     start = time.perf_counter()
     try:
         screenshot = sct.grab(monitor)
@@ -112,7 +118,9 @@ def capture(region: Tuple[int, int, int, int] = None) -> PILImage:
         screenshot = sct.grab(monitor)
     elapsed_ms = int((time.perf_counter() - start) * 1000)
     if CAPTURE_LOG_SAMPLE_RATE > 0 and random.random() < CAPTURE_LOG_SAMPLE_RATE:
-        log_line = json.dumps({"time_capture_ms": elapsed_ms})
+        log_line = json.dumps(
+            {"time_capture_ms": elapsed_ms, "monitor": bounds.get("monitor", "unknown")}
+        )
         if CAPTURE_LOG_DEST == "stderr":
             print(log_line, file=sys.stderr)
         elif CAPTURE_LOG_DEST.startswith("file:"):
@@ -208,10 +216,15 @@ def _parse_region(arg: str) -> Dict[str, int]:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Save a screenshot to a PNG file")
     group = parser.add_mutually_exclusive_group()
-    group.add_argument("--active", action="store_true", help="capture the active window")
+    group.add_argument(
+        "--active", action="store_true", help="capture the active window"
+    )
     group.add_argument("--window", type=str, help="capture first window matching regex")
     group.add_argument("--region", type=str, help="capture explicit region x,y,w,h")
-    parser.add_argument("output", nargs="?", default="screenshot.png", help="output PNG path")
+    parser.add_argument("--json", action="store_true", help="output JSON result")
+    parser.add_argument(
+        "output", nargs="?", default="screenshot.png", help="output PNG path"
+    )
     args = parser.parse_args()
     region = None
     try:
@@ -251,10 +264,20 @@ def main() -> None:
             data["region"] = region
         print(json.dumps(data))
         sys.exit(2)
+    except SystemExit as e:  # standardize CLI errors as JSON
+        data = {"error": str(e)}
+        print(json.dumps(data))
+        code = e.code if isinstance(e.code, int) else 1
+        sys.exit(code)
 
     out_path = Path(args.output)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     img.save(out_path)
+    if args.json:
+        result = {"output": str(out_path)}
+        if region is not None:
+            result["region"] = region
+        print(json.dumps(result))
 
 
 if __name__ == "__main__":  # pragma: no cover - CLI entry point
