@@ -31,6 +31,37 @@ screenshot.main()
     assert '"stage": "test"' in result.stderr
 
 
+def test_screenshot_logfile_separation(tmp_path):
+    out = tmp_path / "out.png"
+    log = tmp_path / "log.jsonl"
+    script = f'''
+import sys, screenshot
+class DummyImg:
+    def save(self, path):
+        pass
+
+def fake_capture(region):
+    screenshot._log_sampled({{"stage":"test"}})
+    return DummyImg()
+
+screenshot.capture = fake_capture
+sys.argv = ["screenshot.py", "--json", "--region", "0,0,1,1", "{out}"]
+screenshot.main()
+'''
+    env = os.environ.copy()
+    env["CAPTURE_LOG_SAMPLE_RATE"] = "1"
+    env["CAPTURE_LOG_DEST"] = f"file:{log}"
+    result = subprocess.run(
+        [sys.executable, "-c", script], capture_output=True, text=True, env=env
+    )
+    assert result.returncode == 0
+    assert json.loads(result.stdout) == {"output": str(out), "region": [0, 0, 1, 1]}
+    assert result.stderr == ""
+    lines = log.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 1
+    assert json.loads(lines[0]) == {"stage": "test"}
+
+
 def test_emit_cli_json_utf8():
     script = (
         "import cli\n"
