@@ -55,7 +55,10 @@ def _validate_bbox(
     if right <= left or bottom <= top:
         region = (left, top, right, bottom)
         if bounds is not None:
-            raise ValueError(f"Invalid capture region {region} within {bounds}")
+            mon = bounds.get("monitor", "unknown")
+            raise ValueError(
+                f"Invalid capture region {region} within {bounds} on {mon}"
+            )
         raise ValueError(f"Invalid capture region {region}")
 
 
@@ -113,12 +116,10 @@ def capture(region: Tuple[int, int, int, int] = None) -> PILImage:
         if CAPTURE_LOG_DEST == "stderr":
             print(log_line, file=sys.stderr)
         elif CAPTURE_LOG_DEST.startswith("file:"):
-            path = CAPTURE_LOG_DEST[5:]
-            try:
-                with open(path, "a") as f:
-                    f.write(log_line + "\n")
-            except Exception:
-                pass
+            path = Path(CAPTURE_LOG_DEST[5:])
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open("a", encoding="utf-8") as f:
+                f.write(log_line + "\n")
     return Image.frombytes("RGB", screenshot.size, screenshot.rgb)
 
 
@@ -135,19 +136,31 @@ def get_monitor_bounds_for_point(x: int, y: int) -> Dict[str, int]:
         _reset_sct()
         sct = _get_sct()
         monitors = sct.monitors
-    for mon in monitors[1:]:
+    for idx, mon in enumerate(monitors[1:], start=1):
         left = mon["left"]
         top = mon["top"]
         right = left + mon["width"]
         bottom = top + mon["height"]
         if left <= x < right and top <= y < bottom:
-            return {"left": left, "top": top, "right": right, "bottom": bottom}
+            return {
+                "left": left,
+                "top": top,
+                "right": right,
+                "bottom": bottom,
+                "monitor": f"mon{idx}",
+            }
     mon = monitors[0]
     left = mon["left"]
     top = mon["top"]
     right = left + mon["width"]
     bottom = top + mon["height"]
-    return {"left": left, "top": top, "right": right, "bottom": bottom}
+    return {
+        "left": left,
+        "top": top,
+        "right": right,
+        "bottom": bottom,
+        "monitor": "virtual",
+    }
 
 
 def capture_around(
@@ -200,35 +213,48 @@ def main() -> None:
     group.add_argument("--region", type=str, help="capture explicit region x,y,w,h")
     parser.add_argument("output", nargs="?", default="screenshot.png", help="output PNG path")
     args = parser.parse_args()
+    region = None
+    try:
+        if args.region:
+            mon = _parse_region(args.region)
+            region = (
+                mon["left"],
+                mon["top"],
+                mon["left"] + mon["width"],
+                mon["top"] + mon["height"],
+            )
+        elif args.active or args.window:
+            try:
+                import pygetwindow as gw
+            except Exception:  # pragma: no cover - optional dependency
+                raise SystemExit("pygetwindow is required for window capture")
+            if args.active:
+                win = gw.getActiveWindow()
+                if win is None:
+                    raise SystemExit("No active window found")
+            else:
+                pattern = re.compile(args.window)
+                matches = [w for w in gw.getAllWindows() if pattern.search(w.title)]
+                if not matches:
+                    raise SystemExit("No window matches pattern")
+                win = matches[0]
+            region = (
+                win.left,
+                win.top,
+                win.left + win.width,
+                win.top + win.height,
+            )
+        img = capture(region)
+    except ValueError as e:
+        data = {"error": str(e)}
+        if region is not None:
+            data["region"] = region
+        print(json.dumps(data))
+        sys.exit(2)
 
-    monitor = None
-    if args.region:
-        monitor = _parse_region(args.region)
-    elif args.active or args.window:
-        try:
-            import pygetwindow as gw
-        except Exception:  # pragma: no cover - optional dependency
-            raise SystemExit("pygetwindow is required for window capture")
-        if args.active:
-            win = gw.getActiveWindow()
-            if win is None:
-                raise SystemExit("No active window found")
-        else:
-            pattern = re.compile(args.window)
-            matches = [w for w in gw.getAllWindows() if pattern.search(w.title)]
-            if not matches:
-                raise SystemExit("No window matches pattern")
-            win = matches[0]
-        monitor = {"left": win.left, "top": win.top, "width": win.width, "height": win.height}
-
-    with mss.mss() as sct:
-        if monitor is None:
-            monitor = sct.monitors[0]
-        shot = sct.grab(monitor)
-        img = Image.frombytes("RGB", shot.size, shot.rgb)
-        out_path = Path(args.output)
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        img.save(out_path)
+    out_path = Path(args.output)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    img.save(out_path)
 
 
 if __name__ == "__main__":  # pragma: no cover - CLI entry point
