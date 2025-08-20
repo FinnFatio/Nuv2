@@ -6,7 +6,6 @@ import sys
 if "" in sys.path:
     sys.path.remove("")
     sys.path.append("")
-import fastapi
 from fastapi import FastAPI, Query, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -70,7 +69,7 @@ _REQUEST_LOG: Dict[str, deque] = defaultdict(deque)
 
 @app.middleware("http")
 async def add_request_id_and_rate_limit(request: Request, call_next):
-    request_id = uuid.uuid4().hex
+    request_id = request.headers.get("X-Request-Id") or uuid.uuid4().hex
     REQUEST_ID.set(request_id)
     ip = request.client.host if request.client else "unknown"
     now = time.time()
