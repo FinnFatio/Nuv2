@@ -15,7 +15,12 @@ from PIL.Image import Image as PILImage  # classe para tipagem
 import argparse
 import re
 from pathlib import Path
-from settings import CAPTURE_WIDTH, CAPTURE_HEIGHT
+from settings import (
+    CAPTURE_WIDTH,
+    CAPTURE_HEIGHT,
+    CAPTURE_LOG_SAMPLE_RATE,
+    CAPTURE_LOG_DEST,
+)
 
 
 _SCT: "mss.mss" | None = None
@@ -42,6 +47,16 @@ def _get_sct() -> "mss.mss":
 
 
 atexit.register(_reset_sct)
+
+
+def _validate_bbox(
+    left: int, top: int, right: int, bottom: int, bounds: Optional[Dict[str, int]] = None
+) -> None:
+    if right <= left or bottom <= top:
+        region = (left, top, right, bottom)
+        if bounds is not None:
+            raise ValueError(f"Invalid capture region {region} within {bounds}")
+        raise ValueError(f"Invalid capture region {region}")
 
 
 def get_screen_bounds() -> Tuple[int, int, int, int]:
@@ -71,6 +86,7 @@ def capture(region: Tuple[int, int, int, int] = None) -> PILImage:
     sct = _get_sct()
     if region:
         left, top, right, bottom = region
+        _validate_bbox(left, top, right, bottom)
         monitor = {
             "left": left,
             "top": top,
@@ -92,13 +108,26 @@ def capture(region: Tuple[int, int, int, int] = None) -> PILImage:
         sct = _get_sct()
         screenshot = sct.grab(monitor)
     elapsed_ms = int((time.perf_counter() - start) * 1000)
-    if random.random() < 0.1:
-        print(json.dumps({"time_capture_ms": elapsed_ms}), file=sys.stderr)
+    if CAPTURE_LOG_SAMPLE_RATE > 0 and random.random() < CAPTURE_LOG_SAMPLE_RATE:
+        log_line = json.dumps({"time_capture_ms": elapsed_ms})
+        if CAPTURE_LOG_DEST == "stderr":
+            print(log_line, file=sys.stderr)
+        elif CAPTURE_LOG_DEST.startswith("file:"):
+            path = CAPTURE_LOG_DEST[5:]
+            try:
+                with open(path, "a") as f:
+                    f.write(log_line + "\n")
+            except Exception:
+                pass
     return Image.frombytes("RGB", screenshot.size, screenshot.rgb)
 
 
 def get_monitor_bounds_for_point(x: int, y: int) -> Dict[str, int]:
-    """Return monitor bounds containing point (x, y) or virtual screen."""
+    """Return bounds of monitor containing ``(x, y)`` or the virtual screen.
+
+    If the point does not fall within any individual monitor, the virtual
+    screen bounds are returned as a fallback.
+    """
     sct = _get_sct()
     try:
         monitors = sct.monitors
@@ -151,8 +180,7 @@ def capture_around(
     top = max(screen_top, top)
     right = min(screen_right, right)
     bottom = min(screen_bottom, bottom)
-    if right <= left or bottom <= top:
-        raise ValueError("Invalid capture region")
+    _validate_bbox(left, top, right, bottom, bounds)
 
     region = (left, top, right, bottom)
     return capture(region), region
