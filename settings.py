@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 from pathlib import Path
 
 DEFAULTS = {
@@ -47,10 +48,27 @@ def load_settings() -> dict:
     for key in DEFAULTS:
         if key in os.environ:
             cfg[key] = os.environ[key]
-    cfg["CAPTURE_WIDTH"] = int(cfg["CAPTURE_WIDTH"])
-    cfg["CAPTURE_HEIGHT"] = int(cfg["CAPTURE_HEIGHT"])
-    cfg["UIA_THRESHOLD"] = float(cfg["UIA_THRESHOLD"])
-    cfg["CAPTURE_LOG_SAMPLE_RATE"] = float(cfg["CAPTURE_LOG_SAMPLE_RATE"])
+
+    for key in ("CAPTURE_WIDTH", "CAPTURE_HEIGHT"):
+        try:
+            cfg[key] = int(cfg[key])
+        except Exception:
+            print(
+                f"Invalid {key}={cfg[key]!r}, using default {DEFAULTS[key]!r}",
+                file=sys.stderr,
+            )
+            cfg[key] = DEFAULTS[key]
+
+    for key in ("UIA_THRESHOLD", "CAPTURE_LOG_SAMPLE_RATE"):
+        try:
+            cfg[key] = float(cfg[key])
+        except Exception:
+            print(
+                f"Invalid {key}={cfg[key]!r}, using default {DEFAULTS[key]!r}",
+                file=sys.stderr,
+            )
+            cfg[key] = DEFAULTS[key]
+
     cfg["CAPTURE_LOG_DEST"] = str(cfg["CAPTURE_LOG_DEST"])
     return cfg
 
