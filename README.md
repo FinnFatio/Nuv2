@@ -65,3 +65,17 @@ Principais dependências:
 - `fastapi` para o servidor HTTP.
 - `pygetwindow` (opcional) para manipulação de janelas.
 
+## Desenvolvimento
+
+Para configurar o ambiente de desenvolvimento e executar as validações locais:
+
+```sh
+pip install -r requirements.txt
+pip install pre-commit
+pre-commit install
+pre-commit run --all-files
+```
+
+As verificações incluem formatação e lint com `ruff`, tipos estritos com `mypy` para
+`cli.py`, `logger.py` e `settings.py`, além de testes com `pytest -q`.
+

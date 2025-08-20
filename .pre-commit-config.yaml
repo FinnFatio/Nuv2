@@ -1,0 +1,19 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.3.5
+    hooks:
+      - id: ruff-format
+      - id: ruff
+        args: [--fix]
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: mypy --strict --follow-imports=skip cli.py logger.py settings.py
+        language: system
+        files: ^(cli|logger|settings)\.py$
+      - id: pytest
+        name: pytest
+        entry: pytest -q
+        language: system
+        pass_filenames: false
