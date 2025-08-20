@@ -124,12 +124,13 @@ def test_capture_logs_time_ms(monkeypatch):
 
     class DummySCT:
         def grab(self, monitor):
-            return DummyGrab
+            return DummyGrab()
 
     monkeypatch.setattr(screenshot, "_get_sct", lambda: DummySCT())
     monkeypatch.setattr(
         screenshot, "Image", types.SimpleNamespace(frombytes=lambda *a, **k: object())
     )
+    monkeypatch.setattr(screenshot, "CAPTURE_LOG_SAMPLE_RATE", 1.0)
     monkeypatch.setattr(screenshot.random, "random", lambda: 0.0)
 
     buf = io.StringIO()
@@ -139,6 +140,12 @@ def test_capture_logs_time_ms(monkeypatch):
 
     data = json.loads(buf.getvalue().strip())
     assert "time_capture_ms" in data
+
+
+def test_capture_invalid_region(monkeypatch):
+    monkeypatch.setattr(screenshot, "_get_sct", lambda: object())
+    with pytest.raises(ValueError):
+        screenshot.capture((0, 0, 0, 10))
 
 
 def test_capture_around_zero_area(monkeypatch):
