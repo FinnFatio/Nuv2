@@ -109,3 +109,21 @@ def test_env_overridden_by_params(monkeypatch, capsys):
     assert logger.RATE_LIMIT_INTERVAL == pytest.approx(0.2)
     assert logger.get_logger().level == logging.DEBUG
     assert data["message"] == "dbg"
+
+
+def test_setup_param_overrides_env(monkeypatch):
+    reload_logger()
+    monkeypatch.setenv("LOG_LEVEL", "warning")
+    logger.setup(level="debug")
+    assert logger.LOGGER.level == logging.DEBUG
+
+
+def test_component_added_to_log(capsys):
+    reload_logger()
+    logger.COMPONENT.set("cli")
+    logger.setup(enable=True, jsonl=True)
+    start = time.time()
+    logger.log("stage", start)
+    out = capsys.readouterr().err.strip()
+    data = json.loads(out)
+    assert data["component"] == "cli"

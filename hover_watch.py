@@ -2,7 +2,7 @@ import argparse
 import json
 import time
 from resolve import describe_under_cursor
-from logger import setup
+from logger import setup, COMPONENT
 
 
 def main() -> None:
@@ -13,7 +13,8 @@ def main() -> None:
         "--rate-limit-hz", type=float, default=None, help="max log frequency"
     )
     args = parser.parse_args()
-    setup(args.jsonl, rate_limit_hz=args.rate_limit_hz)
+    setup(enable=args.jsonl, jsonl=args.jsonl, rate_limit_hz=args.rate_limit_hz)
+    COMPONENT.set("cli")
     delay = 1.0 / args.hz if args.hz > 0 else 0
     try:
         while True:

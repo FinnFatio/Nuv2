@@ -20,7 +20,7 @@ from settings import (
     CAPTURE_LOG_SAMPLE_RATE,
     CAPTURE_LOG_DEST,
 )
-from logger import log_call
+from logger import log_call, setup, COMPONENT
 from cli import emit_cli_json
 
 ERROR_CODE_MAP = {
@@ -311,6 +311,8 @@ def main() -> None:
         "output", nargs="?", default="screenshot.png", help="output PNG path"
     )
     args = parser.parse_args()
+    setup()
+    COMPONENT.set("cli")
     region = None
     try:
         if args.region:
