@@ -196,6 +196,41 @@ def test_capture_log_creates_directory(monkeypatch, tmp_path):
     assert "monitor" in data
 
 
+def test_get_screen_bounds_recovers_from_failure(monkeypatch):
+    class BadSCT:
+        def close(self):
+            pass
+
+        @property
+        def monitors(self):
+            raise RuntimeError("boom")
+
+    class GoodSCT:
+        monitors = [
+            {"left": 0, "top": 0, "width": 100, "height": 100}
+        ]
+
+    scts = iter([BadSCT(), GoodSCT()])
+    calls = []
+
+    def fake_get_sct():
+        calls.append(None)
+        return next(scts)
+
+    reset_called = []
+
+    def fake_reset():
+        reset_called.append(True)
+
+    monkeypatch.setattr(screenshot, "_get_sct", fake_get_sct)
+    monkeypatch.setattr(screenshot, "_reset_sct", fake_reset)
+
+    bounds = screenshot.get_screen_bounds()
+    assert bounds == (0, 0, 100, 100)
+    assert len(calls) == 2
+    assert reset_called
+
+
 def test_main_errors_return_json(monkeypatch, capsys):
     monkeypatch.setattr(sys, "argv", ["screenshot.py", "--region", "bad", "out.png"])
     with pytest.raises(SystemExit) as exc:
@@ -242,3 +277,31 @@ def test_main_json_success(monkeypatch, tmp_path, capsys):
     out = json.loads(capsys.readouterr().out.strip())
     assert out["output"] == str(out_file)
     assert out["region"] == [0, 0, 1, 1]
+
+
+def test_main_window_not_found_outputs_json(monkeypatch, capsys):
+    class DummyWin:
+        title = "Other"
+
+    gw_module = types.SimpleNamespace(getAllWindows=lambda: [DummyWin()])
+    monkeypatch.setitem(sys.modules, "pygetwindow", gw_module)
+    monkeypatch.setattr(sys, "argv", ["screenshot.py", "--window", "Missing"])
+    with pytest.raises(SystemExit) as exc:
+        screenshot.main()
+    assert exc.value.code == 1
+    data = json.loads(capsys.readouterr().out.strip())
+    assert data["error"] == "No window matches pattern"
+
+
+def test_main_json_includes_null_region(monkeypatch, tmp_path, capsys):
+    class DummyImg:
+        def save(self, path):
+            pass
+
+    monkeypatch.setattr(screenshot, "capture", lambda region: DummyImg())
+    out_file = tmp_path / "out.png"
+    monkeypatch.setattr(sys, "argv", ["screenshot.py", "--json", str(out_file)])
+    screenshot.main()
+    data = json.loads(capsys.readouterr().out.strip())
+    assert data["output"] == str(out_file)
+    assert "region" in data and data["region"] is None
