@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 import types
@@ -14,8 +15,9 @@ ROOT = os.path.dirname(os.path.dirname(__file__))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-from fastapi.testclient import TestClient
-import api
+from fastapi.testclient import TestClient  # noqa: E402
+import api  # noqa: E402
+import logger  # noqa: E402
 
 
 def fake_describe_under_cursor(x=None, y=None):
@@ -50,7 +52,9 @@ def fake_capture(region):
 def test_api_routes(monkeypatch):
     api.ELEMENT_CACHE.clear()
     api.BOUNDS_CACHE.clear()
-    monkeypatch.setattr(api.resolve, "describe_under_cursor", fake_describe_under_cursor)
+    monkeypatch.setattr(
+        api.resolve, "describe_under_cursor", fake_describe_under_cursor
+    )
     monkeypatch.setattr(api.screenshot, "capture", fake_capture)
     client = TestClient(api.app)
 
@@ -165,8 +169,10 @@ def test_snapshot_both_id_and_region(monkeypatch):
 def test_snapshot_capture_error_map(monkeypatch):
     api.ELEMENT_CACHE.clear()
     api.BOUNDS_CACHE.clear()
+
     def boom(region):
         raise ValueError("No active window found")
+
     monkeypatch.setattr(api.screenshot, "capture", boom)
     client = TestClient(api.app)
     resp = client.get("/snapshot", params={"region": "0,0,1,1"})
@@ -199,7 +205,9 @@ def test_healthz_endpoint(monkeypatch):
 def test_rate_limit(monkeypatch):
     api.ELEMENT_CACHE.clear()
     api.BOUNDS_CACHE.clear()
-    monkeypatch.setattr(api.resolve, "describe_under_cursor", fake_describe_under_cursor)
+    monkeypatch.setattr(
+        api.resolve, "describe_under_cursor", fake_describe_under_cursor
+    )
     monkeypatch.setattr(api, "API_RATE_LIMIT_PER_MIN", 2)
     api._REQUEST_LOG.clear()
     client = TestClient(api.app)
@@ -235,7 +243,30 @@ def test_inspect_tesseract_error(monkeypatch):
     client = TestClient(api.app)
     resp = client.get("/inspect")
     assert resp.status_code == 200
-    assert (
-        resp.json()["data"]["errors"]["extract_text"] == "tesseract_failed"
+    assert resp.json()["data"]["errors"]["extract_text"] == "tesseract_failed"
+
+
+def test_request_id_logged(monkeypatch):
+    api.ELEMENT_CACHE.clear()
+    api.BOUNDS_CACHE.clear()
+    monkeypatch.setattr(
+        api.resolve, "describe_under_cursor", fake_describe_under_cursor
     )
 
+    class CaptureLogger:
+        def __init__(self):
+            self.last = None
+
+        def log(self, level, msg, *args, **kwargs):
+            self.last = msg
+
+    cap = CaptureLogger()
+    monkeypatch.setattr(logger, "get_logger", lambda: cap)
+    monkeypatch.setattr(logger, "LOGGER", cap)
+
+    client = TestClient(api.app)
+    rid = "fixed-id"
+    resp = client.get("/inspect", headers={"X-Request-Id": rid})
+    assert resp.status_code == 200
+    data = json.loads(cap.last)
+    assert data["request_id"] == rid
