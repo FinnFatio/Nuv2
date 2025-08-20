@@ -274,9 +274,7 @@ def main() -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     img.save(out_path)
     if args.json:
-        result = {"output": str(out_path)}
-        if region is not None:
-            result["region"] = region
+        result = {"output": str(out_path), "region": region}
         print(json.dumps(result))
 
 
