@@ -20,6 +20,7 @@ sys.modules["PIL.Image"] = image_module
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 import screenshot
+import metrics
 
 
 def stub_capture(region):
@@ -242,6 +243,15 @@ def test_reset_sct_logs_reason(monkeypatch):
     data = json.loads(buf.getvalue().strip())
     assert data["stage"] == "mss.reset"
     assert data["reason"] == "monitors_failed"
+
+
+def test_reset_records_metric(monkeypatch):
+    metrics.reset()
+    screenshot._SCT = types.SimpleNamespace(close=lambda: None)
+    screenshot._reset_sct("forced")
+    summary = metrics.summary()
+    assert summary["resets_total"] == 1
+    assert summary["fallbacks"]["resets"] == 1
 
 
 def test_health_check(monkeypatch):
