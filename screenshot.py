@@ -11,7 +11,6 @@ import atexit
 
 import mss
 from PIL import Image
-from PIL.Image import Image as PILImage  # classe para tipagem
 import argparse
 import re
 from pathlib import Path
@@ -21,6 +20,12 @@ from settings import (
     CAPTURE_LOG_SAMPLE_RATE,
     CAPTURE_LOG_DEST,
 )
+
+ERROR_CODE_MAP = {
+    "pygetwindow is required for window capture": "pygetwindow_missing",
+    "No active window found": "no_active_window",
+    "No window matches pattern": "window_not_found",
+}
 
 
 _SCT: "mss.mss" | None = None
@@ -88,7 +93,7 @@ def get_screen_resolution() -> Tuple[int, int]:
     return right - left, bottom - top
 
 
-def capture(region: Tuple[int, int, int, int] = None) -> PILImage:
+def capture(region: Tuple[int, int, int, int] = None) -> Image.Image:
     """Capture a screenshot of the given region."""
     sct = _get_sct()
     if region:
@@ -176,7 +181,7 @@ def capture_around(
     width: int = CAPTURE_WIDTH,
     height: int = CAPTURE_HEIGHT,
     bounds: Optional[Dict[str, int]] = None,
-) -> Tuple[PILImage, Tuple[int, int, int, int]]:
+) -> Tuple[Image.Image, Tuple[int, int, int, int]]:
     """Capture a screenshot centered on the given point.
 
     If ``bounds`` is provided, the captured region will be clipped to lie
@@ -223,6 +228,9 @@ def main() -> None:
     group.add_argument("--region", type=str, help="capture explicit region x,y,w,h")
     parser.add_argument("--json", action="store_true", help="output JSON result")
     parser.add_argument(
+        "--first", type=int, default=None, help="limit window search to first N"
+    )
+    parser.add_argument(
         "output", nargs="?", default="screenshot.png", help="output PNG path"
     )
     args = parser.parse_args()
@@ -246,11 +254,14 @@ def main() -> None:
                 if win is None:
                     raise SystemExit("No active window found")
             else:
-                pattern = re.compile(args.window)
-                matches = [w for w in gw.getAllWindows() if pattern.search(w.title)]
-                if not matches:
-                    raise SystemExit("No window matches pattern")
-                win = matches[0]
+                  pattern = re.compile(args.window, re.IGNORECASE)
+                  windows = gw.getAllWindows()
+                  if args.first is not None:
+                      windows = windows[: args.first]
+                  matches = [w for w in windows if pattern.search(w.title)]
+                  if not matches:
+                      raise SystemExit("No window matches pattern")
+                  win = matches[0]
             region = (
                 win.left,
                 win.top,
@@ -259,13 +270,14 @@ def main() -> None:
             )
         img = capture(region)
     except ValueError as e:
-        data = {"error": str(e)}
+        data = {"error": str(e), "code": "bad_region"}
         if region is not None:
             data["region"] = region
         print(json.dumps(data))
         sys.exit(2)
     except SystemExit as e:  # standardize CLI errors as JSON
-        data = {"error": str(e)}
+        msg = str(e)
+        data = {"error": msg, "code": ERROR_CODE_MAP.get(msg, "unknown")}
         print(json.dumps(data))
         code = e.code if isinstance(e.code, int) else 1
         sys.exit(code)

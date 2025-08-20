@@ -26,3 +26,13 @@ def test_load_settings_priority_and_invalid(monkeypatch, tmp_path, capsys):
 
     err = capsys.readouterr().err
     assert "Invalid CAPTURE_LOG_SAMPLE_RATE" in err
+
+
+def test_version_stamp_in_config_digest(capsys):
+    import importlib
+
+    importlib.reload(settings)
+    out = capsys.readouterr().err.strip()
+    data = json.loads(out)
+    assert "version_stamp" in data
+    assert "python" in data["version_stamp"]

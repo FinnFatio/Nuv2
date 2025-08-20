@@ -10,9 +10,12 @@ def main(argv=None):
     """Collect and print information under the mouse cursor."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--jsonl", action="store_true", help="Enable JSONL logging")
+    parser.add_argument(
+        "--rate-limit-hz", type=float, default=None, help="max log frequency"
+    )
     args = parser.parse_args(argv)
 
-    setup(args.jsonl)
+    setup(args.jsonl, rate_limit_hz=args.rate_limit_hz)
 
     try:
         # Chamada evita deslocamento de coordenadas em ambientes com scaling >100%.

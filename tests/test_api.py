@@ -96,7 +96,7 @@ def test_details_unknown_id():
 
     resp = client.get("/details", params={"id": "unknown"})
     assert resp.status_code == 404
-    assert resp.json() == {"error": "id not found"}
+    assert resp.json() == {"error": "id not found", "code": "id_not_found"}
 
 
 def test_snapshot_unknown_id(monkeypatch):
@@ -108,7 +108,7 @@ def test_snapshot_unknown_id(monkeypatch):
 
     resp = client.get("/snapshot", params={"id": "missing"})
     assert resp.status_code == 404
-    assert resp.json() == {"error": "id not found"}
+    assert resp.json() == {"error": "id not found", "code": "id_not_found"}
 
 
 def test_snapshot_invalid_region(monkeypatch):
@@ -119,5 +119,5 @@ def test_snapshot_invalid_region(monkeypatch):
 
     resp = client.get("/snapshot", params={"region": "bad"})
     assert resp.status_code == 400
-    assert resp.json() == {"error": "invalid region"}
+    assert resp.json() == {"error": "invalid region", "code": "invalid_region"}
 

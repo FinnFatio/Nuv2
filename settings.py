@@ -1,7 +1,11 @@
 import json
 import os
 import sys
+import platform
 from pathlib import Path
+import mss
+import PIL
+import pytesseract
 
 DEFAULTS = {
     "OCR_LANG": "por+eng",
@@ -78,7 +82,16 @@ def load_settings() -> dict:
             origins[key] = "default"
 
     cfg["CAPTURE_LOG_DEST"] = str(cfg["CAPTURE_LOG_DEST"])
-    print(json.dumps({"config_digest": origins}), file=sys.stderr)
+    version_stamp = {
+        "python": platform.python_version(),
+        "mss": getattr(mss, "__version__", None),
+        "pillow": getattr(PIL, "__version__", None),
+        "pytesseract": getattr(pytesseract, "__version__", None),
+    }
+    print(
+        json.dumps({"config_digest": origins, "version_stamp": version_stamp}),
+        file=sys.stderr,
+    )
     return cfg
 
 
