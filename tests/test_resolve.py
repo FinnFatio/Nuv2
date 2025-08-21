@@ -5,8 +5,11 @@ import hashlib
 # Stub out dependencies before importing resolve
 sys.modules["mss"] = types.SimpleNamespace()
 pil_module = types.ModuleType("PIL")
-pil_module.Image = object
+pil_module.__path__ = []
+image_module = types.ModuleType("PIL.Image")
+image_module.Image = object
 sys.modules["PIL"] = pil_module
+sys.modules["PIL.Image"] = image_module
 sys.modules["pytesseract"] = types.SimpleNamespace(
     Output=types.SimpleNamespace(DICT={}),
     pytesseract=types.SimpleNamespace(tesseract_cmd=""),
@@ -81,9 +84,17 @@ def test_ids_and_cache(monkeypatch):
     resolve = get_resolve()
     monkeypatch.setattr(resolve, "RUNTIME_SALT", "salt")
     ancestors = [
-        {"control_type": "Window", "name": "Main"},
-        {"control_type": "Pane", "name": "Content"},
-        {"control_type": "Edit", "name": "Input"},
+        {"control_type": "Window", "name": "Main", "automation_id": "MainWin"},
+        {
+            "control_type": "Pane",
+            "name": "Content",
+            "automation_id": "ContentPane",
+        },
+        {
+            "control_type": "Edit",
+            "name": "Input",
+            "automation_id": "InputField",
+        },
     ]
     window = {
         "pid": 123,
@@ -97,6 +108,7 @@ def test_ids_and_cache(monkeypatch):
         "bounds": {"left": 0, "top": 0, "right": 100, "bottom": 100},
         "is_offscreen": False,
         "affordances": {"editable": True},
+        "automation_id": "InputField",
         "ancestors": ancestors,
     }
     monkeypatch.setattr(
@@ -107,18 +119,22 @@ def test_ids_and_cache(monkeypatch):
     )
     monkeypatch.setattr(resolve, "extract_text", lambda img, region=None: ("ocr", 0.5))
     result = resolve.describe_under_cursor(0, 0)
-    window_path = "/Window:Main"
-    control_path = "/Window:Main/Pane:Content/Edit:Input"
-    expected_window_id = hashlib.sha256(f"123|{window_path}|salt".encode()).hexdigest()[
-        :16
-    ]
+    window_path = "/Window:MainWin"
+    control_path = "/Window:MainWin/Pane:ContentPane/Edit:InputField"
+    expected_window_id = hashlib.sha256(
+        f"123|{window_path}|MainWin|salt".encode()
+    ).hexdigest()[:16]
     expected_control_id = hashlib.sha256(
-        f"123|{control_path}|salt".encode()
+        f"123|{control_path}|InputField|salt".encode()
     ).hexdigest()[:16]
     assert result["window_id"] == expected_window_id
     assert result["control_id"] == expected_control_id
     assert resolve.ID_CACHE["last_window_id"] == expected_window_id
     assert resolve.ID_CACHE["last_editable_control_id"] == expected_control_id
+    assert result["state_digest"] == {
+        "last_window_id": expected_window_id,
+        "last_editable_control_id": expected_control_id,
+    }
 
 
 def test_error_capture(monkeypatch):

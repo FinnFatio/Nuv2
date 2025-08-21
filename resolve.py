@@ -25,9 +25,9 @@ ID_CACHE: Dict[str, str | None] = {
 }
 
 
-def _hash_components(pid: int, path: str) -> str:
+def _hash_components(pid: int, path: str, automation_id: str) -> str:
     """Create a stable short hash for the given components."""
-    data = f"{pid}|{path}|{RUNTIME_SALT}".encode()
+    data = f"{pid}|{path}|{automation_id}|{RUNTIME_SALT}".encode()
     return hashlib.sha256(data).hexdigest()[:16]
 
 
@@ -35,9 +35,10 @@ def _compute_ids(window: Dict[str, Any], element: Dict[str, Any]) -> Tuple[str, 
     """Return stable window and control identifiers."""
     pid = int(window.get("pid") or 0)
     ancestors = element.get("ancestors") or []
-    path_segments = [
-        f"{a.get('control_type', '')}:{a.get('name', '')}" for a in ancestors
-    ]
+    path_segments = []
+    for a in ancestors:
+        seg = a.get("automation_id") or a.get("name", "")
+        path_segments.append(f"{a.get('control_type', '')}:{seg}")
     control_path = "/" + "/".join(path_segments)
     window_index = max(
         (i for i, a in enumerate(ancestors) if a.get("control_type") == "Window"),
@@ -45,10 +46,13 @@ def _compute_ids(window: Dict[str, Any], element: Dict[str, Any]) -> Tuple[str, 
     )
     if window_index >= 0:
         window_path = "/" + "/".join(path_segments[: window_index + 1])
+        window_ai = ancestors[window_index].get("automation_id", "")
     else:
         window_path = control_path
-    window_id = _hash_components(pid, window_path)
-    control_id = _hash_components(pid, control_path)
+        window_ai = element.get("automation_id", "")
+    control_ai = element.get("automation_id", "")
+    window_id = _hash_components(pid, window_path, window_ai)
+    control_id = _hash_components(pid, control_path, control_ai)
     return window_id, control_id
 
 
@@ -196,6 +200,10 @@ def describe_under_cursor(x: int | None = None, y: int | None = None) -> Dict[st
         "confidence": {"uia": uia_conf, "ocr": ocr_conf},
         "window_id": window_id,
         "control_id": control_id,
+        "state_digest": {
+            "last_window_id": ID_CACHE.get("last_window_id"),
+            "last_editable_control_id": ID_CACHE.get("last_editable_control_id"),
+        },
         "timings": timings,
         "errors": errors,
     }

@@ -170,6 +170,7 @@ def get_element_info(x: int, y: int) -> Tuple[Dict, Dict, str, float]:
                 "id": f"{prefix}{counter}",
                 "control_type": ctype or "",
                 "name": current.name or "",
+                "automation_id": getattr(current, "automation_id", "") or "",
             }
         )
         counter += 1
