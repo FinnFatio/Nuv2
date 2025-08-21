@@ -1,8 +1,19 @@
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import (
+    Any,
+    Dict,
+    Callable,
+    Awaitable,
+    Deque,
+    DefaultDict,
+    ParamSpec,
+    TypeVar,
+    cast,
+)
 import io
 import sys
+from contextvars import Token
 
 # Ensure standard library modules have priority over local names like inspect.py
 if "" in sys.path:
@@ -17,7 +28,7 @@ import resolve
 import screenshot
 from screenshot import ERROR_CODE_MAP
 from primitives import Bounds, ErrorEnvelope, ErrorInfo, OkEnvelope
-from logger import setup, log_call, REQUEST_ID, COMPONENT
+from logger import setup, log_call as _log_call, REQUEST_ID, COMPONENT
 import metrics
 import uuid
 from settings import (
@@ -26,6 +37,10 @@ from settings import (
     API_RATE_LIMIT_PER_MIN,
     API_CORS_ORIGINS,
 )
+
+P = ParamSpec("P")
+T = TypeVar("T")
+log_call = cast(Callable[[Callable[P, T]], Callable[P, T]], _log_call)
 
 # Enable JSON logging similar to CLI tools
 setup(enable=True, jsonl=True)
@@ -56,17 +71,20 @@ def error_response(
     return {"ok": False, "error": err, "meta": {"version": version}}
 
 
-# Caches for element details and bounds keyed by IDs
-ELEMENT_CACHE: Dict[str, Dict] = {}
+ELEMENT_CACHE: Dict[str, Dict[str, Any]] = {}
 BOUNDS_CACHE: Dict[str, Bounds] = {}
 
-_REQUEST_LOG: Dict[str, deque] = defaultdict(deque)
+# Janela deslizante de timestamps por IP para rate limit (últimos 60s)
+_REQUEST_LOG: DefaultDict[str, Deque[float]] = defaultdict(lambda: deque())
 
 
 @app.middleware("http")
-async def add_request_id_and_rate_limit(request: Request, call_next):
+async def add_request_id_and_rate_limit(
+    request: Request,
+    call_next: Callable[[Request], Awaitable[Response]],
+) -> Response:
     request_id = request.headers.get("X-Request-Id") or uuid.uuid4().hex
-    REQUEST_ID.set(request_id)
+    token: Token[str] = REQUEST_ID.set(request_id)
     ip = request.client.host if request.client else "unknown"
     now = time.time()
     dq = _REQUEST_LOG[ip]
@@ -78,14 +96,16 @@ async def add_request_id_and_rate_limit(request: Request, call_next):
         response = JSONResponse(envelope, status_code=429)
         response.headers["Retry-After"] = "60"
         response.headers["X-Request-Id"] = request_id
-        REQUEST_ID.set(None)
+        REQUEST_ID.reset(token)
         return response
     dq.append(now)
-    response = await call_next(request)
-    metrics.record_request(request.url.path, response.status_code >= 400)
-    response.headers["X-Request-Id"] = request_id
-    REQUEST_ID.set(None)
-    return response
+    try:
+        response = await call_next(request)
+        metrics.record_request(request.url.path, response.status_code >= 400)
+        response.headers["X-Request-Id"] = request_id
+        return response
+    finally:
+        REQUEST_ID.reset(token)
 
 
 @app.get("/inspect")
@@ -141,6 +161,7 @@ def snapshot(id: str | None = None, region: str | None = None) -> Response:
             bounds["bottom"],
         )
     else:
+        assert region is not None
         try:
             x, y, w, h = map(int, region.split(","))
         except Exception:
@@ -172,12 +193,17 @@ def snapshot(id: str | None = None, region: str | None = None) -> Response:
     return resp
 
 
-@app.head("/healthz")
 @app.get("/healthz")
 @log_call
 def healthz() -> JSONResponse:
     """Return basic screenshot health information."""
     return JSONResponse(ok_response(screenshot.health_check()))
+
+
+@app.head("/healthz")
+def healthz_head() -> Response:
+    # HEAD deve retornar 200 com corpo vazio
+    return Response(status_code=200)
 
 
 @app.get("/metrics")
