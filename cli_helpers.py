@@ -26,13 +26,13 @@ def emit_cli_json(data: Dict[str, Any], code: int) -> None:
     else:
         payload["error"] = data
     payload["meta"] = {"version": API_VERSION}
-    sys.stdout.write(_dump_json(payload) + "\n")
-    sys.stdout.flush()
+    sys.stdout.buffer.write((_dump_json(payload) + "\n").encode("utf-8"))
+    sys.stdout.buffer.flush()
     raise SystemExit(code)
 
 
 def emit_cli_json_line(data: Dict[str, Any]) -> None:
     """Write a single compact JSON line without exiting."""
 
-    sys.stdout.write(_dump_json(data) + "\n")
-    sys.stdout.flush()
+    sys.stdout.buffer.write((_dump_json(data) + "\n").encode("utf-8"))
+    sys.stdout.buffer.flush()

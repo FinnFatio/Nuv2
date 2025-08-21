@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter, deque
-from typing import Deque, Dict
+from typing import Deque, Dict, Tuple
 
 _WINDOW = 100
 
@@ -14,6 +14,8 @@ _times: Dict[str, Deque[int]] = {
 _fallbacks: Counter[str] = Counter()
 _route_total: Counter[str] = Counter()
 _route_errors: Counter[str] = Counter()
+_route_status: Counter[Tuple[str, int]] = Counter()
+_rate_limited_total = 0
 
 
 def record_time(kind: str, elapsed_ms: int) -> None:
@@ -26,10 +28,14 @@ def record_fallback(name: str) -> None:
     _fallbacks[name] += 1
 
 
-def record_request(route: str, error: bool) -> None:
+def record_request(route: str, status: int) -> None:
+    global _rate_limited_total
     _route_total[route] += 1
-    if error:
+    if status >= 400:
         _route_errors[route] += 1
+    _route_status[(route, status)] += 1
+    if status == 429:
+        _rate_limited_total += 1
 
 
 def _percentile(dq: Deque[int], pct: float) -> int | None:
@@ -54,10 +60,15 @@ def summary() -> Dict:
         route: (_route_errors[route] / total if total else 0.0)
         for route, total in _route_total.items()
     }
+    status_total: Dict[str, Dict[int, int]] = {}
+    for (route, status), count in _route_status.items():
+        status_total.setdefault(route, {})[status] = count
     return {
         "latency_ms": latency,
         "fallbacks": dict(_fallbacks),
         "error_rate": error_rate,
+        "status_total": status_total,
+        "rate_limited_total": _rate_limited_total,
         "resets_total": _fallbacks.get("resets", 0),
     }
 
@@ -68,3 +79,6 @@ def reset() -> None:
     _fallbacks.clear()
     _route_total.clear()
     _route_errors.clear()
+    _route_status.clear()
+    global _rate_limited_total
+    _rate_limited_total = 0

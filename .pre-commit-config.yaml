@@ -14,7 +14,7 @@ repos:
         language: system
         files: '^(cli_helpers|logger|settings|primitives)\.py$'
       - id: mypy-strict
-        name: mypy (strict)
+        name: mypy (strict-targets)
         entry: mypy --config-file mypy.ini --strict
         language: system
         files: '^(api|resolve|screenshot)\.py$'

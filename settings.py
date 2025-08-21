@@ -24,6 +24,8 @@ DEFAULTS: dict[str, Any] = {
     "SNAPSHOT_MAX_SIDE": 2000,
     "API_RATE_LIMIT_PER_MIN": 60,
     "API_CORS_ORIGINS": "",
+    "TRUST_PROXY": False,
+    "SAFE_MODE": True,
 }
 
 CONFIG_SOURCES: dict[str, str] = {}
@@ -115,6 +117,19 @@ def load_settings() -> dict[str, Any]:
         cfg["LOG_FORMAT"] = DEFAULTS["LOG_FORMAT"]
         origins["LOG_FORMAT"] = "default"
 
+    cfg["TRUST_PROXY"] = str(cfg["TRUST_PROXY"]).lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    cfg["SAFE_MODE"] = str(cfg["SAFE_MODE"]).lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
     if cfg["CAPTURE_LOG_DEST"].startswith("file:"):
         path = Path(cfg["CAPTURE_LOG_DEST"][5:])
         try:
@@ -163,3 +178,5 @@ SNAPSHOT_MAX_AREA = CONFIG["SNAPSHOT_MAX_AREA"]
 SNAPSHOT_MAX_SIDE = CONFIG["SNAPSHOT_MAX_SIDE"]
 API_RATE_LIMIT_PER_MIN = CONFIG["API_RATE_LIMIT_PER_MIN"]
 API_CORS_ORIGINS = CONFIG["API_CORS_ORIGINS"]
+TRUST_PROXY = CONFIG["TRUST_PROXY"]
+SAFE_MODE = CONFIG["SAFE_MODE"]

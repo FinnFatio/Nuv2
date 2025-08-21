@@ -204,6 +204,16 @@ def test_healthz_endpoint(monkeypatch):
     assert resp.json()["data"] == {"ok": True}
 
 
+def test_healthz_head(monkeypatch):
+    api.ELEMENT_CACHE.clear()
+    api.BOUNDS_CACHE.clear()
+    monkeypatch.setattr(api.screenshot, "health_check", lambda: {"ok": True})
+    client = TestClient(api.app)
+    resp = client.head("/healthz")
+    assert resp.status_code == 200
+    assert resp.content == b""
+
+
 def test_rate_limit(monkeypatch):
     api.ELEMENT_CACHE.clear()
     api.BOUNDS_CACHE.clear()
@@ -220,6 +230,23 @@ def test_rate_limit(monkeypatch):
     data = resp.json()
     assert data["error"]["code"] == "rate_limit"
     assert resp.headers["Retry-After"] == "60"
+    assert "X-Request-Id" in resp.headers
+
+
+def test_rate_limit_trust_proxy(monkeypatch):
+    api.ELEMENT_CACHE.clear()
+    api.BOUNDS_CACHE.clear()
+    monkeypatch.setattr(
+        api.resolve, "describe_under_cursor", fake_describe_under_cursor
+    )
+    monkeypatch.setattr(api, "API_RATE_LIMIT_PER_MIN", 1)
+    monkeypatch.setattr(api, "TRUST_PROXY", True)
+    api._REQUEST_LOG.clear()
+    client = TestClient(api.app)
+    headers = {"X-Forwarded-For": "1.2.3.4"}
+    client.get("/inspect", headers=headers)
+    resp = client.get("/inspect", headers=headers)
+    assert resp.status_code == 429
 
 
 def test_inspect_tesseract_error(monkeypatch):
