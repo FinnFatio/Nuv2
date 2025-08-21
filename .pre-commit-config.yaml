@@ -13,6 +13,11 @@ repos:
         entry: mypy --config-file mypy.ini
         language: system
         files: '^(cli_helpers|logger|settings|primitives)\.py$'
+      - id: mypy-strict
+        name: mypy (strict)
+        entry: mypy --config-file mypy.ini --strict
+        language: system
+        files: '^(api|resolve|screenshot)\.py$'
       - id: pytest
         name: pytest
         entry: pytest -q
