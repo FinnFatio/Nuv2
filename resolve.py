@@ -104,12 +104,13 @@ def describe_under_cursor(x: int | None = None, y: int | None = None) -> Dict[st
     else:
         bounds = None
     try:
-        img, _ = capture_around(pos, bounds=bounds)
+        img, region = capture_around(pos, bounds=bounds)
         log("capture_around.end", start)
     except Exception as e:  # pragma: no cover - defensive
         log("capture_around.error", start, error=str(e))
         errors["capture_around"] = str(e)
         img = None
+        region = (0, 0, 0, 0)
     timings["capture_around"] = {"start": start, "end": time.time()}
 
     # extract_text
@@ -117,7 +118,15 @@ def describe_under_cursor(x: int | None = None, y: int | None = None) -> Dict[st
     log("extract_text.start", start)
     if img is not None:
         try:
-            ocr_text, ocr_conf = extract_text(img)
+            crop = None
+            if bounds is not None:
+                crop = (
+                    max(0, bounds["left"] - region[0]),
+                    max(0, bounds["top"] - region[1]),
+                    max(0, min(region[2], bounds["right"]) - region[0]),
+                    max(0, min(region[3], bounds["bottom"]) - region[1]),
+                )
+            ocr_text, ocr_conf = extract_text(img, region=crop)
             log("extract_text.end", start)
         except Exception as e:  # pragma: no cover - defensive
             log("extract_text.error", start, error=str(e))
@@ -178,9 +187,13 @@ def describe_under_cursor(x: int | None = None, y: int | None = None) -> Dict[st
         "cursor": pos,
         "window": window,
         "element": element,
-        "text": {"uia": uia_text, "ocr": ocr_text, "chosen": chosen},
+        "text": {
+            "uia": uia_text,
+            "ocr": ocr_text,
+            "chosen": chosen,
+            "source": source,
+        },
         "confidence": {"uia": uia_conf, "ocr": ocr_conf},
-        "source": source,
         "window_id": window_id,
         "control_id": control_id,
         "timings": timings,
