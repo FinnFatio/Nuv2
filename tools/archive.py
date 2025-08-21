@@ -39,10 +39,9 @@ def read(
         if pp.is_absolute() or ".." in pp.parts:
             raise ValueError("bad_path")
         info = z.getinfo(inner_path)
-        if info.file_size > max_bytes:
+        ratio = (info.file_size or 1) / max(info.compress_size or 1, 1)
+        if ratio > 1000 or info.file_size > max_bytes:
             raise ValueError("too_big")
-        if info.compress_size and info.file_size / info.compress_size > 100:
-            raise ValueError("compression_ratio")
         data = z.read(info)[:max_bytes]
     return {
         "inner_path": inner_path,
