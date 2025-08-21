@@ -19,7 +19,9 @@ def main(argv=None):
     COMPONENT.set("cli")
 
     try:
-        # Chamada evita deslocamento de coordenadas em ambientes com scaling >100%.
+        # Attempt to enable DPI awareness so coordinates aren't offset on
+        # Windows when display scaling is above 100%. This is a fallback and
+        # is silently ignored if unsupported.
         ctypes.windll.user32.SetProcessDPIAware()
     except AttributeError:
         pass
