@@ -30,6 +30,9 @@ ERROR_CODE_MAP = {
     "No active window found": "no_active_window",
     "No window matches pattern": "window_not_found",
     "window search timeout": "window_search_timeout",
+    "width_height_nonpositive": "width_height_nonpositive",
+    "bbox_inverted": "bbox_inverted",
+    "bbox_negative": "bbox_negative",
 }
 
 
@@ -81,14 +84,14 @@ def _validate_bbox(
     bottom: int,
     bounds: Bounds | None = None,
 ) -> None:
-    if right <= left or bottom <= top:
-        region = (left, top, right, bottom)
-        if bounds is not None:
-            mon = bounds.get("monitor", "unknown")
-            raise ValueError(
-                f"Invalid capture region {region} within {bounds} on {mon}"
-            )
-        raise ValueError(f"Invalid capture region {region}")
+    width = right - left
+    height = bottom - top
+    if left < 0 or top < 0 or right < 0 or bottom < 0:
+        raise ValueError("bbox_negative")
+    if width <= 0 or height <= 0:
+        if width < 0 or height < 0:
+            raise ValueError("bbox_inverted")
+        raise ValueError("width_height_nonpositive")
 
 
 def get_screen_bounds() -> Tuple[int, int, int, int]:

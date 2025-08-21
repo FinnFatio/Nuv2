@@ -156,8 +156,11 @@ def snapshot(id: str | None = None, region: str | None = None) -> Response:
     try:
         img = screenshot.capture(region_tuple)
     except ValueError as e:
-        code = ERROR_CODE_MAP.get(str(e), "bad_region")
-        return JSONResponse(error_response(code, str(e)), status_code=400)
+        msg = str(e)
+        code = ERROR_CODE_MAP.get(msg)
+        if code is None:
+            code = "bad_region"
+        return JSONResponse(error_response(code, msg), status_code=400)
     except Exception as e:  # pragma: no cover - unexpected capture failure
         code = ERROR_CODE_MAP.get(str(e), "capture_failed")
         return JSONResponse(error_response(code, str(e)), status_code=500)
