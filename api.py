@@ -172,6 +172,7 @@ def snapshot(id: str | None = None, region: str | None = None) -> Response:
     return resp
 
 
+@app.head("/healthz")
 @app.get("/healthz")
 @log_call
 def healthz() -> JSONResponse:
