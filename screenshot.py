@@ -160,7 +160,7 @@ def health_check() -> Dict[str, object]:
     }
 
 
-@log_call
+@log_call  # type: ignore[misc]
 def capture(region: Optional[Tuple[int, int, int, int]] = None) -> Image.Image:
     """Capture a screenshot of the given region."""
     sct = _get_sct()
@@ -337,7 +337,12 @@ def main() -> None:
             )
         elif args.monitor:
             mbounds = get_monitor_bounds(args.monitor)
-            region = (mbounds["left"], mbounds["top"], mbounds["right"], mbounds["bottom"])
+            region = (
+                mbounds["left"],
+                mbounds["top"],
+                mbounds["right"],
+                mbounds["bottom"],
+            )
         elif args.active or args.window:
             try:
                 import pygetwindow as gw

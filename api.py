@@ -98,7 +98,7 @@ BOUNDS_CACHE: Dict[str, Bounds] = {}
 _REQUEST_LOG: DefaultDict[str, Deque[float]] = defaultdict(lambda: deque(maxlen=120))
 
 
-@app.middleware("http")
+@app.middleware("http")  # type: ignore[misc]
 async def add_request_id_and_rate_limit(
     request: Request,
     call_next: Callable[[Request], Awaitable[Response]],
@@ -133,7 +133,7 @@ async def add_request_id_and_rate_limit(
         REQUEST_ID.reset(token)
 
 
-@app.get("/inspect")
+@app.get("/inspect")  # type: ignore[misc]
 @log_call
 def inspect(
     x: int | None = Query(default=None), y: int | None = Query(default=None)
@@ -152,7 +152,7 @@ def inspect(
     return JSONResponse(ok_response(info))
 
 
-@app.get("/details")
+@app.get("/details")  # type: ignore[misc]
 @log_call
 def details(id: str = Query(...)) -> JSONResponse:
     """Return cached element details for the given control or window ID."""
@@ -164,7 +164,7 @@ def details(id: str = Query(...)) -> JSONResponse:
     return JSONResponse(ok_response(element))
 
 
-@app.get("/snapshot")
+@app.get("/snapshot")  # type: ignore[misc]
 @log_call
 def snapshot(id: str | None = None, region: str | None = None) -> Response:
     """Return a PNG screenshot by element ID or explicit region."""
@@ -218,15 +218,15 @@ def snapshot(id: str | None = None, region: str | None = None) -> Response:
     return resp
 
 
-@app.get("/healthz")
-@app.head("/healthz")
+@app.get("/healthz")  # type: ignore[misc]
+@app.head("/healthz")  # type: ignore[misc]
 @log_call
 def healthz() -> JSONResponse:
     """Return basic screenshot health information."""
     return JSONResponse(ok_response(screenshot.health_check()))
 
 
-@app.get("/metrics")
+@app.get("/metrics")  # type: ignore[misc]
 @log_call
 def get_metrics() -> JSONResponse:
     """Return aggregated latency, fallback and error information."""
@@ -238,7 +238,7 @@ class ToolCallModel(BaseModel):  # type: ignore[misc]
     args: Dict[str, Any] = Field(default_factory=dict)
 
 
-@app.get("/v1/tools.list")
+@app.get("/v1/tools.list")  # type: ignore[misc]
 def tools_list(request: Request) -> JSONResponse:
     auth = _require_api_key(request)
     if auth:
@@ -256,7 +256,7 @@ def tools_list(request: Request) -> JSONResponse:
     return JSONResponse(ok_response({"tools": cards}))
 
 
-@app.post("/v1/tools.call")
+@app.post("/v1/tools.call")  # type: ignore[misc]
 def tools_call(body: ToolCallModel, request: Request) -> JSONResponse:
     req_id = REQUEST_ID.get()
     auth = _require_api_key(request)
