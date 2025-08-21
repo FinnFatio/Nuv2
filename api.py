@@ -76,7 +76,8 @@ ELEMENT_CACHE: Dict[str, Dict[str, Any]] = {}
 BOUNDS_CACHE: Dict[str, Bounds] = {}
 
 # Janela deslizante de timestamps por IP para rate limit (últimos 60s)
-_REQUEST_LOG: DefaultDict[str, Deque[float]] = defaultdict(lambda: deque())
+# Limita o deque para evitar crescimento descontrolado sob carga anômala
+_REQUEST_LOG: DefaultDict[str, Deque[float]] = defaultdict(lambda: deque(maxlen=120))
 
 
 @app.middleware("http")
@@ -199,13 +200,11 @@ def snapshot(id: str | None = None, region: str | None = None) -> Response:
 
 
 @app.get("/healthz")
+@app.head("/healthz")
 @log_call
 def healthz() -> JSONResponse:
     """Return basic screenshot health information."""
     return JSONResponse(ok_response(screenshot.health_check()))
-
-
-app.head("/healthz")(healthz)
 
 
 @app.get("/metrics")
