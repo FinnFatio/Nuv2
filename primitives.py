@@ -17,6 +17,13 @@ class Point(TypedDict):
     y: int
 
 
+class MonitorDict(TypedDict):
+    left: int
+    top: int
+    width: int
+    height: int
+
+
 class Bounds(TypedDict):
     left: Required[int]
     top: Required[int]
