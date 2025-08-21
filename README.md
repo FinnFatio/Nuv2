@@ -79,33 +79,33 @@ pre-commit run --all-files
 As verificações incluem formatação e lint com `ruff`, tipos estritos com `mypy` para
 `cli_helpers.py`, `logger.py` e `settings.py`, além de testes com `pytest -q`.
 
-## Links
+## Links principais (raw)
 
 ### Documentação
-- [Milestone](https://github.com/FinnFatio/Nuv2/blob/main/Milestone.md)  
-- [README](https://github.com/FinnFatio/Nuv2/blob/main/README.md)  
-- [Changelog](https://github.com/FinnFatio/Nuv2/blob/main/chatgpt.md)  
+- [Milestone](https://raw.githubusercontent.com/FinnFatio/Nuv2/main/Milestone.md)
+- [README](https://raw.githubusercontent.com/FinnFatio/Nuv2/main/README.md)
+- [Changelog](https://raw.githubusercontent.com/FinnFatio/Nuv2/main/chatgpt.md)
 
 ### Núcleo
-- [api.py](https://github.com/FinnFatio/Nuv2/blob/main/api.py)  
-- [resolve.py](https://github.com/FinnFatio/Nuv2/blob/main/resolve.py)  
-- [screenshot.py](https://github.com/FinnFatio/Nuv2/blob/main/screenshot.py)  
-- [ocr.py](https://github.com/FinnFatio/Nuv2/blob/main/ocr.py)  
-- [primitives.py](https://github.com/FinnFatio/Nuv2/blob/main/primitives.py)  
+- [api.py](https://raw.githubusercontent.com/FinnFatio/Nuv2/main/api.py)
+- [resolve.py](https://raw.githubusercontent.com/FinnFatio/Nuv2/main/resolve.py)
+- [screenshot.py](https://raw.githubusercontent.com/FinnFatio/Nuv2/main/screenshot.py)
+- [ocr.py](https://raw.githubusercontent.com/FinnFatio/Nuv2/main/ocr.py)
+- [primitives.py](https://raw.githubusercontent.com/FinnFatio/Nuv2/main/primitives.py)
 
 ### Utilitários
-- [cli_helpers.py](https://github.com/FinnFatio/Nuv2/blob/main/cli_helpers.py)  
-- [cursor.py](https://github.com/FinnFatio/Nuv2/blob/main/cursor.py)  
-- [hover_watch.py](https://github.com/FinnFatio/Nuv2/blob/main/hover_watch.py)  
-- [inspect_point.py](https://github.com/FinnFatio/Nuv2/blob/main/inspect_point.py)  
+- [cli_helpers.py](https://raw.githubusercontent.com/FinnFatio/Nuv2/main/cli_helpers.py)
+- [cursor.py](https://raw.githubusercontent.com/FinnFatio/Nuv2/main/cursor.py)
+- [hover_watch.py](https://raw.githubusercontent.com/FinnFatio/Nuv2/main/hover_watch.py)
+- [inspect_point.py](https://raw.githubusercontent.com/FinnFatio/Nuv2/main/inspect_point.py)
 
 ### Infra/Config
-- [logger.py](https://github.com/FinnFatio/Nuv2/blob/main/logger.py)  
-- [metrics.py](https://github.com/FinnFatio/Nuv2/blob/main/metrics.py)  
-- [mypy.ini](https://github.com/FinnFatio/Nuv2/blob/main/mypy.ini)  
-- [requirements.txt](https://github.com/FinnFatio/Nuv2/blob/main/requirements.txt)  
-- [settings.py](https://github.com/FinnFatio/Nuv2/blob/main/settings.py)  
+- [logger.py](https://raw.githubusercontent.com/FinnFatio/Nuv2/main/logger.py)
+- [metrics.py](https://raw.githubusercontent.com/FinnFatio/Nuv2/main/metrics.py)
+- [mypy.ini](https://raw.githubusercontent.com/FinnFatio/Nuv2/main/mypy.ini)
+- [requirements.txt](https://raw.githubusercontent.com/FinnFatio/Nuv2/main/requirements.txt)
+- [settings.py](https://raw.githubusercontent.com/FinnFatio/Nuv2/main/settings.py)
 
 ### Outros
-- [uia.py](https://github.com/FinnFatio/Nuv2/blob/main/uia.py)  
-- [what_is_under_mouse.py](https://github.com/FinnFatio/Nuv2/blob/main/what_is_under_mouse.py)
+- [uia.py](https://raw.githubusercontent.com/FinnFatio/Nuv2/main/uia.py)
+- [what_is_under_mouse.py](https://raw.githubusercontent.com/FinnFatio/Nuv2/main/what_is_under_mouse.py)
