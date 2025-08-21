@@ -4,7 +4,9 @@ from typing import (
     Any,
     Dict,
     Literal,
+    NotRequired,
     Protocol,
+    Required,
     Tuple,
     TypedDict,
 )
@@ -15,12 +17,12 @@ class Point(TypedDict):
     y: int
 
 
-class Bounds(TypedDict, total=False):
-    left: int
-    top: int
-    right: int
-    bottom: int
-    monitor: str
+class Bounds(TypedDict):
+    left: Required[int]
+    top: Required[int]
+    right: Required[int]
+    bottom: Required[int]
+    monitor: NotRequired[str]
 
 
 class GrabResult(Protocol):
