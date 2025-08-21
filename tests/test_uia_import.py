@@ -3,16 +3,25 @@ import uia
 
 
 def test_get_element_info_defaults_when_pywinauto_missing(monkeypatch):
-    monkeypatch.setattr(uia, "UIAElementInfo", None)
-    app, element, text, conf = get_element_info(10, 20)
-    assert app == {"pid": None, "exe": None, "window_title": None}
+    monkeypatch.setattr(uia, "PUIAElementInfo", None)
+    window, element, text, conf = get_element_info(10, 20)
+    assert window == {
+        "handle": None,
+        "active": None,
+        "pid": None,
+        "title": None,
+        "app_path": None,
+        "bounds": None,
+    }
     assert element == {
         "control_type": None,
-        "bounds": None,
         "automation_id": None,
         "name": None,
+        "value": None,
+        "role": None,
         "is_enabled": None,
         "is_offscreen": None,
+        "bounds": None,
         "patterns": [],
         "affordances": {},
         "ancestors": [],

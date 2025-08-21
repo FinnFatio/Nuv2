@@ -4,10 +4,10 @@ from typing import Dict, Tuple, List
 import psutil
 
 try:  # pragma: no cover - optional on non-Windows platforms
-    from pywinauto.uia_element_info import UIAElementInfo
+    from pywinauto.uia_element_info import UIAElementInfo as PUIAElementInfo
     from pywinauto import uia_defines
 except Exception:  # pragma: no cover - pywinauto may be unavailable
-    UIAElementInfo = None  # type: ignore
+    PUIAElementInfo = None  # type: ignore
     uia_defines = None  # type: ignore
 
 from logger import log_call
@@ -15,22 +15,31 @@ from logger import log_call
 
 @log_call
 def get_element_info(x: int, y: int) -> Tuple[Dict, Dict, str, float]:
-    """Return app info, element info, text and confidence for position.
+    """Return window info, element info, text and confidence for position.
 
     The element dictionary contains UIA properties, supported patterns,
     derived affordances and the ancestor chain with opaque IDs.
     """
 
-    if UIAElementInfo is None:  # pragma: no cover - pywinauto missing
+    if PUIAElementInfo is None:  # pragma: no cover - pywinauto missing
         return (
-            {"pid": None, "exe": None, "window_title": None},
+            {
+                "handle": None,
+                "active": None,
+                "pid": None,
+                "title": None,
+                "app_path": None,
+                "bounds": None,
+            },
             {
                 "control_type": None,
-                "bounds": None,
                 "automation_id": None,
                 "name": None,
+                "value": None,
+                "role": None,
                 "is_enabled": None,
                 "is_offscreen": None,
+                "bounds": None,
                 "patterns": [],
                 "affordances": {},
                 "ancestors": [],
@@ -40,17 +49,26 @@ def get_element_info(x: int, y: int) -> Tuple[Dict, Dict, str, float]:
         )
 
     try:
-        info = UIAElementInfo.from_point((x, y))
+        info = PUIAElementInfo.from_point((x, y))
     except Exception:
         return (
-            {"pid": None, "exe": None, "window_title": None},
+            {
+                "handle": None,
+                "active": None,
+                "pid": None,
+                "title": None,
+                "app_path": None,
+                "bounds": None,
+            },
             {
                 "control_type": None,
-                "bounds": None,
                 "automation_id": None,
                 "name": None,
+                "value": None,
+                "role": None,
                 "is_enabled": None,
                 "is_offscreen": None,
+                "bounds": None,
                 "patterns": [],
                 "affordances": {},
                 "ancestors": [],
@@ -69,16 +87,47 @@ def get_element_info(x: int, y: int) -> Tuple[Dict, Dict, str, float]:
     pid = info.element.CurrentProcessId
     try:
         proc = psutil.Process(pid)
-        exe = proc.name()
+        app_path = proc.exe()
     except Exception:
-        exe = None
+        app_path = None
 
     window = info.get_top_level_parent()
-    window_title = window.name if window else ""
+    window_bounds = None
+    handle = None
+    active = None
+    title = ""
+    if window is not None:
+        title = window.name or ""
+        handle = getattr(window, "handle", None)
+        try:
+            active = bool(window.element.CurrentHasKeyboardFocus)
+        except Exception:
+            active = None
+        try:
+            window_bounds = {
+                "left": window.rectangle.left,
+                "top": window.rectangle.top,
+                "right": window.rectangle.right,
+                "bottom": window.rectangle.bottom,
+            }
+        except Exception:
+            window_bounds = None
 
     control_type = getattr(info, "control_type", None)
     automation_id = getattr(info, "automation_id", None)
     name = info.name or ""
+    role = getattr(info, "localized_control_type", None)
+    try:
+        value = info.element.CurrentValue  # type: ignore[attr-defined]
+    except Exception:
+        try:
+            value = info.element.GetCurrentPropertyValue(
+                30045
+            )  # LegacyIAccessibleValue
+        except Exception:
+            value = ""
+    if value is None:
+        value = ""
     try:
         is_enabled = info.element.CurrentIsEnabled
     except Exception:
@@ -131,12 +180,21 @@ def get_element_info(x: int, y: int) -> Tuple[Dict, Dict, str, float]:
         current = parent
     ancestors.reverse()
 
-    app = {"pid": pid, "exe": exe, "window_title": window_title}
-    element = {
+    window_info = {
+        "handle": handle,
+        "active": active,
+        "pid": pid,
+        "title": title,
+        "app_path": app_path,
+        "bounds": window_bounds,
+    }
+    element_info = {
         "control_type": control_type,
         "bounds": bounds,
         "automation_id": automation_id,
         "name": name,
+        "role": role,
+        "value": value,
         "is_enabled": is_enabled,
         "is_offscreen": is_offscreen,
         "patterns": patterns,
@@ -144,5 +202,6 @@ def get_element_info(x: int, y: int) -> Tuple[Dict, Dict, str, float]:
         "ancestors": ancestors,
     }
 
-    conf = 1.0 if name else 0.0
-    return app, element, name, conf
+    text = value if value else name
+    conf = 1.0 if text else 0.0
+    return window_info, element_info, text, conf
