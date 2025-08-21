@@ -243,9 +243,12 @@ def test_rate_limit_trust_proxy(monkeypatch):
     monkeypatch.setattr(api, "TRUST_PROXY", True)
     api._REQUEST_LOG.clear()
     client = TestClient(api.app)
-    headers = {"X-Forwarded-For": "1.2.3.4"}
-    client.get("/inspect", headers=headers)
-    resp = client.get("/inspect", headers=headers)
+    # X-Forwarded-For may include multiple comma-separated IP addresses; ensure
+    # the first one is used for rate limiting.
+    headers1 = {"X-Forwarded-For": "1.2.3.4, 7.7.7.7"}
+    headers2 = {"X-Forwarded-For": "1.2.3.4, 8.8.8.8"}
+    client.get("/inspect", headers=headers1)
+    resp = client.get("/inspect", headers=headers2)
     assert resp.status_code == 429
 
 

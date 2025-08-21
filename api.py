@@ -88,10 +88,11 @@ async def add_request_id_and_rate_limit(
     request_id = request.headers.get("X-Request-Id") or uuid.uuid4().hex
     token: Token[str] = REQUEST_ID.set(request_id)
     ip = request.client.host if request.client else "unknown"
-    if TRUST_PROXY:
-        forwarded = request.headers.get("X-Forwarded-For")
-        if forwarded:
-            ip = forwarded.split(",")[0].strip()
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if TRUST_PROXY and forwarded_for:
+        # X-Forwarded-For may contain a comma separated list of addresses;
+        # the client IP is the first one in the list.
+        ip = forwarded_for.split(",", 1)[0].strip()
     now = time.time()
     dq = _REQUEST_LOG[ip]
     while dq and now - dq[0] > 60:
