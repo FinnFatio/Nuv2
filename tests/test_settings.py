@@ -7,11 +7,13 @@ import settings
 
 def test_load_settings_priority_and_invalid(monkeypatch, tmp_path, capsys):
     (tmp_path / "config.json").write_text(
-        json.dumps({
-            "CAPTURE_WIDTH": 111,
-            "CAPTURE_HEIGHT": 111,
-            "CAPTURE_LOG_SAMPLE_RATE": 0.2,
-        })
+        json.dumps(
+            {
+                "CAPTURE_WIDTH": 111,
+                "CAPTURE_HEIGHT": 111,
+                "CAPTURE_LOG_SAMPLE_RATE": 0.2,
+            }
+        )
     )
     (tmp_path / ".env").write_text(
         "CAPTURE_WIDTH=222\nCAPTURE_HEIGHT=222\nCAPTURE_LOG_SAMPLE_RATE=0.3\n"
@@ -24,7 +26,9 @@ def test_load_settings_priority_and_invalid(monkeypatch, tmp_path, capsys):
 
     assert cfg["CAPTURE_WIDTH"] == 333
     assert cfg["CAPTURE_HEIGHT"] == 222
-    assert cfg["CAPTURE_LOG_SAMPLE_RATE"] == settings.DEFAULTS["CAPTURE_LOG_SAMPLE_RATE"]
+    assert (
+        cfg["CAPTURE_LOG_SAMPLE_RATE"] == settings.DEFAULTS["CAPTURE_LOG_SAMPLE_RATE"]
+    )
 
     err = capsys.readouterr().err
     assert "Invalid CAPTURE_LOG_SAMPLE_RATE" in err
@@ -57,9 +61,7 @@ def test_capture_log_dest_fallback(monkeypatch, capsys):
     def fake_mkdir(self, *args, **kwargs):
         raise PermissionError
 
-    monkeypatch.setenv(
-        "CAPTURE_LOG_DEST", "file:nonexistent/dir/log.txt"
-    )
+    monkeypatch.setenv("CAPTURE_LOG_DEST", "file:nonexistent/dir/log.txt")
     monkeypatch.setenv("LOG_FORMAT", "json")
     monkeypatch.setenv("LOG_LEVEL", "debug")
     monkeypatch.setattr(Path, "mkdir", fake_mkdir)

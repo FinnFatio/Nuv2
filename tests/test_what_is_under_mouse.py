@@ -20,11 +20,16 @@ sys.modules["pytesseract"] = types.SimpleNamespace(
 sys.modules["psutil"] = types.SimpleNamespace(Process=lambda pid: None)
 
 
-import resolve
-import what_is_under_mouse
+def get_modules():
+    import resolve as _r
+    import what_is_under_mouse as _w
+
+    return _r, _w
 
 
 def test_main_reports_tesseract_error(monkeypatch, capsys):
+    resolve, what_is_under_mouse = get_modules()
+
     def boom(*args, **kwargs):
         raise RuntimeError("tesseract_failed")
 
@@ -40,4 +45,3 @@ def test_main_reports_tesseract_error(monkeypatch, capsys):
     data = json.loads(capsys.readouterr().out.strip())
     assert data["error"]["code"] == "tesseract_failed"
     assert data["error"]["message"] == "tesseract_failed"
-

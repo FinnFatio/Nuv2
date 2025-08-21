@@ -1,11 +1,5 @@
-import os
-import sys
 from PIL import Image
 import pytest
-
-ROOT = os.path.dirname(os.path.dirname(__file__))
-if ROOT not in sys.path:
-    sys.path.insert(0, ROOT)
 
 import ocr
 
@@ -18,8 +12,12 @@ def test_extract_text_passes_lang_and_cfg(monkeypatch):
         recorded["config"] = config
         return {"text": ["foo"], "conf": ["100"]}
 
-    monkeypatch.setattr(ocr.pytesseract, "image_to_data", fake_image_to_data, raising=False)
-    monkeypatch.setattr(ocr.pytesseract, "Output", type("O", (), {"DICT": None}), raising=False)
+    monkeypatch.setattr(
+        ocr.pytesseract, "image_to_data", fake_image_to_data, raising=False
+    )
+    monkeypatch.setattr(
+        ocr.pytesseract, "Output", type("O", (), {"DICT": None}), raising=False
+    )
     img = Image.new("RGB", (10, 10))
     text, conf = ocr.extract_text(img)
     assert text == "foo"
@@ -32,8 +30,12 @@ def test_extract_text_missing_binary(monkeypatch):
     def raise_not_found(*args, **kwargs):
         raise FileNotFoundError("missing")
 
-    monkeypatch.setattr(ocr.pytesseract, "image_to_data", raise_not_found, raising=False)
-    monkeypatch.setattr(ocr.pytesseract, "Output", type("O", (), {"DICT": None}), raising=False)
+    monkeypatch.setattr(
+        ocr.pytesseract, "image_to_data", raise_not_found, raising=False
+    )
+    monkeypatch.setattr(
+        ocr.pytesseract, "Output", type("O", (), {"DICT": None}), raising=False
+    )
     img = Image.new("RGB", (10, 10))
     with pytest.raises(RuntimeError) as exc:
         ocr.extract_text(img)
@@ -49,7 +51,9 @@ def test_extract_text_tesseract_error(monkeypatch):
 
     monkeypatch.setattr(ocr.pytesseract, "TesseractError", DummyError, raising=False)
     monkeypatch.setattr(ocr.pytesseract, "image_to_data", raise_error, raising=False)
-    monkeypatch.setattr(ocr.pytesseract, "Output", type("O", (), {"DICT": None}), raising=False)
+    monkeypatch.setattr(
+        ocr.pytesseract, "Output", type("O", (), {"DICT": None}), raising=False
+    )
     img = Image.new("RGB", (10, 10))
     with pytest.raises(RuntimeError) as exc:
         ocr.extract_text(img)

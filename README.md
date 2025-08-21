@@ -77,5 +77,5 @@ pre-commit run --all-files
 ```
 
 As verificações incluem formatação e lint com `ruff`, tipos estritos com `mypy` para
-`cli.py`, `logger.py` e `settings.py`, além de testes com `pytest -q`.
+`cli_helpers.py`, `logger.py` e `settings.py`, além de testes com `pytest -q`.
 

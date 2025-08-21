@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Tuple, Dict, Optional
+from typing import Dict, Optional, Tuple
+from primitives import Bounds, GrabResult, Point
 
 import json
 import time
@@ -21,7 +22,7 @@ from settings import (
     CAPTURE_LOG_DEST,
 )
 from logger import log_call, setup, COMPONENT
-from cli import emit_cli_json
+from cli_helpers import emit_cli_json
 import metrics
 
 ERROR_CODE_MAP = {
@@ -78,7 +79,7 @@ def _validate_bbox(
     top: int,
     right: int,
     bottom: int,
-    bounds: Optional[Dict[str, int]] = None,
+    bounds: Bounds | None = None,
 ) -> None:
     if right <= left or bottom <= top:
         region = (left, top, right, bottom)
@@ -112,7 +113,7 @@ def get_screen_resolution() -> Tuple[int, int]:
     return right - left, bottom - top
 
 
-def get_monitor_bounds(label: str) -> Dict[str, int]:
+def get_monitor_bounds(label: str) -> Bounds:
     """Return bounds of monitor given its label (mon1|mon2|virtual)."""
     sct = _get_sct()
     try:
@@ -157,13 +158,13 @@ def health_check() -> Dict[str, object]:
 
 
 @log_call
-def capture(region: Tuple[int, int, int, int] = None) -> Image.Image:
+def capture(region: Optional[Tuple[int, int, int, int]] = None) -> Image.Image:
     """Capture a screenshot of the given region."""
     sct = _get_sct()
-    if region:
+    if region is not None:
         left, top, right, bottom = region
         _validate_bbox(left, top, right, bottom)
-        monitor = {
+        monitor: Dict[str, int] = {
             "left": left,
             "top": top,
             "width": right - left,
@@ -172,25 +173,28 @@ def capture(region: Tuple[int, int, int, int] = None) -> Image.Image:
         bounds = get_monitor_bounds_for_point((left + right) // 2, (top + bottom) // 2)
     else:
         try:
-            monitor = sct.monitors[0]
+            monitor = sct.monitors[0]  # type: ignore[index]
         except Exception:
             _reset_sct("monitors_failed")
             sct = _get_sct()
-            monitor = sct.monitors[0]
-        bounds = {"monitor": "virtual"}
+            monitor = sct.monitors[0]  # type: ignore[index]
+        bounds: Bounds = {"monitor": "virtual"}
     start = time.perf_counter()
     try:
-        screenshot = sct.grab(monitor)
+        screenshot = sct.grab(monitor)  # type: ignore[arg-type]
     except Exception:
         _reset_sct("monitors_failed")
         sct = _get_sct()
-        screenshot = sct.grab(monitor)
+        screenshot = sct.grab(monitor)  # type: ignore[arg-type]
     elapsed_ms = int((time.perf_counter() - start) * 1000)
-    _log_sampled({"time_capture_ms": elapsed_ms, "monitor": bounds.get("monitor", "unknown")})
-    return Image.frombytes("RGB", screenshot.size, screenshot.rgb)
+    _log_sampled(
+        {"time_capture_ms": elapsed_ms, "monitor": bounds.get("monitor", "unknown")}
+    )
+    gr: GrabResult = screenshot  # type: ignore[assignment]
+    return Image.frombytes("RGB", gr.size, gr.rgb)
 
 
-def get_monitor_bounds_for_point(x: int, y: int) -> Dict[str, int]:
+def get_monitor_bounds_for_point(x: int, y: int) -> Bounds:
     """Return bounds of monitor containing ``(x, y)`` or the virtual screen.
 
     If the point does not fall within any individual monitor, the virtual
@@ -231,10 +235,10 @@ def get_monitor_bounds_for_point(x: int, y: int) -> Dict[str, int]:
 
 
 def capture_around(
-    point: Dict[str, int],
+    point: Point,
     width: int = CAPTURE_WIDTH,
     height: int = CAPTURE_HEIGHT,
-    bounds: Optional[Dict[str, int]] = None,
+    bounds: Bounds | None = None,
 ) -> Tuple[Image.Image, Tuple[int, int, int, int]]:
     """Capture a screenshot centered on the given point.
 
@@ -249,11 +253,10 @@ def capture_around(
     if bounds is None:
         bounds = get_monitor_bounds_for_point(point["x"], point["y"])
 
-    if bounds:
-        left = max(bounds.get("left", left), left)
-        top = max(bounds.get("top", top), top)
-        right = min(bounds.get("right", right), right)
-        bottom = min(bounds.get("bottom", bottom), bottom)
+    left = max(bounds.get("left", left), left)
+    top = max(bounds.get("top", top), top)
+    right = min(bounds.get("right", right), right)
+    bottom = min(bounds.get("bottom", bottom), bottom)
 
     screen_left, screen_top, screen_right, screen_bottom = get_screen_bounds()
     left = max(screen_left, left)
@@ -318,7 +321,10 @@ def main() -> None:
     region = None
     try:
         if args.region:
-            mon = _parse_region(args.region)
+            try:
+                mon = _parse_region(args.region)
+            except Exception:
+                raise ValueError("invalid region")
             region = (
                 mon["left"],
                 mon["top"],
@@ -354,15 +360,25 @@ def main() -> None:
             )
         img = capture(region)
     except ValueError as e:
-        data = {"error": {"code": "bad_region", "message": str(e)}}
-        if region is not None:
-            data["region"] = region
-        emit_cli_json(data, 2)
-    except SystemExit as e:  # standardize CLI errors as JSON
         msg = str(e)
-        data = {"error": {"code": ERROR_CODE_MAP.get(msg, "unknown"), "message": msg}}
+        code_name = "invalid_region" if msg == "invalid region" else "bad_region"
+        if args.json:
+            data = {"code": code_name, "message": msg}
+            if code_name == "bad_region" and region is not None:
+                data["region"] = region
+            emit_cli_json(data, 2)
+        else:
+            print(msg, file=sys.stderr)
+            raise SystemExit(2)
+    except SystemExit as e:  # standardize CLI errors
+        msg = str(e)
         code = e.code if isinstance(e.code, int) else 1
-        emit_cli_json(data, code)
+        if args.json:
+            data = {"code": ERROR_CODE_MAP.get(msg, "unknown"), "message": msg}
+            emit_cli_json(data, code)
+        else:
+            print(msg, file=sys.stderr)
+            raise SystemExit(code)
 
     out_path = Path(args.output)
     out_path.parent.mkdir(parents=True, exist_ok=True)

@@ -1,7 +1,7 @@
 import argparse
 import resolve
 from logger import setup, COMPONENT
-from cli import emit_cli_json
+from cli_helpers import emit_cli_json
 
 
 def main() -> None:

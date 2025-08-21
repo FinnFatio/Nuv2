@@ -4,14 +4,15 @@ repos:
     hooks:
       - id: ruff-format
       - id: ruff
-        args: [--fix]
+        args:
+          - --fix
   - repo: local
     hooks:
       - id: mypy
         name: mypy
-        entry: mypy --strict --follow-imports=skip cli.py logger.py settings.py
+        entry: mypy --config-file mypy.ini
         language: system
-        files: ^(cli|logger|settings)\.py$
+        files: '^(cli_helpers|logger|settings|primitives)\.py$'
       - id: pytest
         name: pytest
         entry: pytest -q
