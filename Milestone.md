@@ -75,12 +75,12 @@ Os milestones M0–M3 representam a fundação: um **visor confiável**, enrique
 ## Milestone M2 — Operabilidade (CLIs + IDs estáveis)
 **Objetivo:** facilitar uso e permitir referência a elementos entre chamadas.
 
-- [ ] **Etapa 1: IDs opacos e cache mínimo de estado**
+- [X] **Etapa 1: IDs opacos e cache mínimo de estado**
   Arquivos: `uia.py`, `resolve.py`  
   **DoD:** gerar `window_id` e `control_id` estáveis (hash de `pid + path UIA + automation_id`); expor `state_digest` com `last_window_id`, `last_editable_control_id`.  
   **Prioridade:** P0 • **Size:** M
 
-- [ ] **Etapa 2: CLIs auxiliares**
+- [X] **Etapa 2: CLIs auxiliares**
   Arquivos: `hover_watch.py`, `inspect_point.py`, (novo) `screenshot_cli.py`  
   **DoD:**  
     - `hover_watch --hz 2` → JSONL contínuo do alvo (com tempos/erros).  
@@ -88,7 +88,7 @@ Os milestones M0–M3 representam a fundação: um **visor confiável**, enrique
     - `screenshot --active|--window "re"|--region x,y,w,h` → salva PNG.  
   **Prioridade:** P1 • **Size:** S
 
- - [ ] **Etapa 3: Núcleo LLM (interno, sem HTTP)**
+ - [X] **Etapa 3: Núcleo LLM (interno, sem HTTP)**
   Arquivos: registry.py, dispatcher.py, policy.py, tools/system.py, tools/fs.py, tools/archive.py, tools/web.py, tests/test_dispatcher_tools.py
   **DoD:**
     - Registry (catálogo) com metadados das ferramentas (nome, versão, resumo, safety, timeout_ms, rate_limit_per_min, enabled_in_safe_mode).
@@ -109,7 +109,7 @@ Os milestones M0–M3 representam a fundação: um **visor confiável**, enrique
 ## Milestone M3 — Runtime HTTP (ponte)
 **Objetivo:** expor a visão como serviço para futuros planners/LLMs.
 
-- [ ] **Etapa 1: Serviço HTTP mínimo de inspeção e snapshot**
+- [X] **Etapa 1: Serviço HTTP mínimo de inspeção e snapshot**
   Arquivo: `api.py`  
   **DoD:**  
     - `GET /inspect?x=&y=` → JSON do alvo (igual ao CLI).  
