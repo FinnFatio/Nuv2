@@ -76,6 +76,28 @@ pre-commit install
 pre-commit run --all-files
 ```
 
+## Links
+
+[Milestone] https://github.com/FinnFatio/Nuv2/blob/main/Milestone.md
+[Readme] https://github.com/FinnFatio/Nuv2/blob/main/README.md
+[Api] https://github.com/FinnFatio/Nuv2/blob/main/api.py
+[Chatgpt.md] https://github.com/FinnFatio/Nuv2/blob/main/chatgpt.md
+[Cli_helpers] https://github.com/FinnFatio/Nuv2/blob/main/cli_helpers.py
+[Cursor] https://github.com/FinnFatio/Nuv2/blob/main/cursor.py
+[Hover_watch] https://github.com/FinnFatio/Nuv2/blob/main/hover_watch.py
+[Inspect Point] https://github.com/FinnFatio/Nuv2/blob/main/inspect_point.py
+[Logger] https://github.com/FinnFatio/Nuv2/blob/main/logger.py
+[Metrics] https://github.com/FinnFatio/Nuv2/blob/main/metrics.py
+[mypy] https://github.com/FinnFatio/Nuv2/blob/main/mypy.ini
+[Ocr] https://github.com/FinnFatio/Nuv2/blob/main/ocr.py
+[Primitives] https://github.com/FinnFatio/Nuv2/blob/main/primitives.py
+[Requirements] https://github.com/FinnFatio/Nuv2/blob/main/requirements.txt
+[Resolve] https://github.com/FinnFatio/Nuv2/blob/main/resolve.py
+[Screenshot] https://github.com/FinnFatio/Nuv2/blob/main/screenshot.py
+[Settings] https://github.com/FinnFatio/Nuv2/blob/main/settings.py
+[Uia] https://github.com/FinnFatio/Nuv2/blob/main/uia.py
+[What_Is_Under_Mouse] https://github.com/FinnFatio/Nuv2/blob/main/what_is_under_mouse.py
+
 As verificações incluem formatação e lint com `ruff`, tipos estritos com `mypy` para
 `cli_helpers.py`, `logger.py` e `settings.py`, além de testes com `pytest -q`.
 
