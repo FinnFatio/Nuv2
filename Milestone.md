@@ -30,17 +30,17 @@ Os milestones M0–M3 representam a fundação: um **visor confiável**, enrique
   **DoD:** `capture()` e `capture_around()` funcionam em setups multi-monitor; p95 < 25ms para região 300×120.
   **Prioridade:** P0 • **Size:** M
 
-- [ ] **Etapa 3: Configurar Tesseract (path/idioma/opções)**
+- [X] **Etapa 3: Configurar Tesseract (path/idioma/opções)**
   Arquivos: `ocr.py`, `settings.py`  
   **DoD:** erro claro se binário ausente; idioma padrão `por+eng`; flags `--oem 3 --psm 6` configuráveis; retorna confiança > 0 em texto simples.  
   **Prioridade:** P0 • **Size:** S
 
-- [ ] **Etapa 4: Clampar região de captura aos bounds da tela**
+- [X] **Etapa 4: Clampar região de captura aos bounds da tela**
   Arquivo: `screenshot.py`  
   **DoD:** `capture_around()` nunca retorna bbox negativa/fora de tela; cantos funcionam.  
   **Prioridade:** P0 • **Size:** S
 
-- [ ] **Etapa 5: Logging estruturado (JSONL) + tempos**
+- [X] **Etapa 5: Logging estruturado (JSONL) + tempos**
   Arquivo: ponto central em `resolve.py` (ou `logger.py`/middleware)  
   **DoD:** cada chamada a `describe_under_cursor()` emite eventos `{stage: "uia|screenshot|ocr|total", elapsed_ms, ok, err}` em JSONL.  
   **Prioridade:** P0 • **Size:** S
