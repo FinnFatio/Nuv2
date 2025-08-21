@@ -7,7 +7,7 @@ from typing import Any
 
 import mss
 import PIL
-import pytesseract  # type: ignore[import-untyped]
+import pytesseract
 
 DEFAULTS: dict[str, Any] = {
     "OCR_LANG": "por+eng",

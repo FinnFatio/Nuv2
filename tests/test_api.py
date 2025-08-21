@@ -1,7 +1,7 @@
 import json
-import os
 import sys
 import types
+from fastapi.testclient import TestClient
 
 pytesseract_module = types.ModuleType("pytesseract")
 pytesseract_module.image_to_string = lambda *a, **k: ""
@@ -11,13 +11,15 @@ for k in list(sys.modules):
     if k.startswith("PIL"):
         sys.modules.pop(k)
 
-ROOT = os.path.dirname(os.path.dirname(__file__))
-if ROOT not in sys.path:
-    sys.path.insert(0, ROOT)
 
-from fastapi.testclient import TestClient  # noqa: E402
-import api  # noqa: E402
-import logger  # noqa: E402
+def get_api_logger():
+    import api as _api
+    import logger as _logger
+
+    return _api, _logger
+
+
+api, logger = get_api_logger()
 
 
 def fake_describe_under_cursor(x=None, y=None):

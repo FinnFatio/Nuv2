@@ -6,6 +6,7 @@ import pytest
 import inspect_point
 import resolve
 
+
 def test_inspect_point_tesseract_error(monkeypatch, capsys):
     def fake_get_position():
         return {"x": 0, "y": 0}
@@ -28,4 +29,4 @@ def test_inspect_point_tesseract_error(monkeypatch, capsys):
         inspect_point.main()
     assert exc.value.code == 0
     data = json.loads(capsys.readouterr().out.strip())
-    assert data["errors"]["extract_text"] == "tesseract_failed"
+    assert data["data"]["errors"]["extract_text"] == "tesseract_failed"

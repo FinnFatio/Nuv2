@@ -6,7 +6,7 @@ import sys
 
 def test_screenshot_stdout_stderr_separation(tmp_path):
     out = tmp_path / "out.png"
-    script = f'''
+    script = f"""
 import sys, screenshot
 class DummyImg:
     def save(self, path):
@@ -19,7 +19,7 @@ def fake_capture(region):
 screenshot.capture = fake_capture
 sys.argv = ["screenshot.py", "--json", "--region", "0,0,1,1", "{out}"]
 screenshot.main()
-'''
+"""
     env = os.environ.copy()
     env["CAPTURE_LOG_SAMPLE_RATE"] = "1"
     env["CAPTURE_LOG_DEST"] = "stderr"
@@ -27,14 +27,18 @@ screenshot.main()
         [sys.executable, "-c", script], capture_output=True, text=True, env=env
     )
     assert result.returncode == 0
-    assert json.loads(result.stdout) == {"output": str(out), "region": [0, 0, 1, 1]}
+    assert json.loads(result.stdout) == {
+        "ok": True,
+        "data": {"output": str(out), "region": [0, 0, 1, 1]},
+        "meta": {"version": "v1"},
+    }
     assert '"stage": "test"' in result.stderr
 
 
 def test_screenshot_logfile_separation(tmp_path):
     out = tmp_path / "out.png"
     log = tmp_path / "log.jsonl"
-    script = f'''
+    script = f"""
 import sys, screenshot
 class DummyImg:
     def save(self, path):
@@ -47,7 +51,7 @@ def fake_capture(region):
 screenshot.capture = fake_capture
 sys.argv = ["screenshot.py", "--json", "--region", "0,0,1,1", "{out}"]
 screenshot.main()
-'''
+"""
     env = os.environ.copy()
     env["CAPTURE_LOG_SAMPLE_RATE"] = "1"
     env["CAPTURE_LOG_DEST"] = f"file:{log}"
@@ -55,8 +59,29 @@ screenshot.main()
         [sys.executable, "-c", script], capture_output=True, text=True, env=env
     )
     assert result.returncode == 0
-    assert json.loads(result.stdout) == {"output": str(out), "region": [0, 0, 1, 1]}
+    assert json.loads(result.stdout) == {
+        "ok": True,
+        "data": {"output": str(out), "region": [0, 0, 1, 1]},
+        "meta": {"version": "v1"},
+    }
     assert result.stderr == ""
+    lines = log.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 1
+    assert json.loads(lines[0]) == {"stage": "test"}
+
+
+def test_log_to_file_doesnt_pollute_stdout(tmp_path):
+    log = tmp_path / "log.jsonl"
+    script = f"""
+import screenshot
+screenshot.CAPTURE_LOG_SAMPLE_RATE = 1
+screenshot.CAPTURE_LOG_DEST = "file:{log}"
+screenshot._log_sampled({{"stage":"test"}})
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", script], capture_output=True, text=True
+    )
+    assert result.stdout == ""
     lines = log.read_text(encoding="utf-8").splitlines()
     assert len(lines) == 1
     assert json.loads(lines[0]) == {"stage": "test"}
@@ -64,11 +89,16 @@ screenshot.main()
 
 def test_emit_cli_json_utf8():
     script = (
-        "import cli\n"
-        "cli.emit_cli_json({'janela': 'café'}, 0)\n"
+        "import cli_helpers\n" "cli_helpers.emit_cli_json({'janela': 'café ☕'}, 0)\n"
     )
     result = subprocess.run([sys.executable, "-c", script], capture_output=True)
     assert result.returncode == 0
-    expected = json.dumps({"janela": "café"}, separators=(",", ":"), ensure_ascii=False) + "\n"
+    expected = (
+        json.dumps(
+            {"ok": True, "data": {"janela": "café ☕"}, "meta": {"version": "v1"}},
+            separators=(",", ":"),
+            ensure_ascii=False,
+        )
+        + "\n"
+    )
     assert result.stdout.decode("utf-8") == expected
-

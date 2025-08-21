@@ -1,13 +1,17 @@
 import argparse
-import json
 import time
 from resolve import describe_under_cursor
 from logger import setup, COMPONENT
+from cli_helpers import emit_cli_json_line
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Poll describe_under_cursor at a fixed rate")
-    parser.add_argument("--hz", type=float, default=1.0, help="polling frequency in Hertz")
+    parser = argparse.ArgumentParser(
+        description="Poll describe_under_cursor at a fixed rate"
+    )
+    parser.add_argument(
+        "--hz", type=float, default=1.0, help="polling frequency in Hertz"
+    )
     parser.add_argument("--jsonl", action="store_true", help="Enable JSONL logging")
     parser.add_argument(
         "--rate-limit-hz", type=float, default=None, help="max log frequency"
@@ -19,7 +23,7 @@ def main() -> None:
     try:
         while True:
             info = describe_under_cursor()
-            print(json.dumps(info, ensure_ascii=False))
+            emit_cli_json_line(info)
             if delay:
                 time.sleep(delay)
     except KeyboardInterrupt:

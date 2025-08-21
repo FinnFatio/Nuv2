@@ -1,4 +1,3 @@
-import os
 import sys
 import types
 import hashlib
@@ -14,17 +13,26 @@ sys.modules["pytesseract"] = types.SimpleNamespace(
 )
 sys.modules["psutil"] = types.SimpleNamespace(Process=lambda pid: None)
 
-# Ensure resolve module can be imported
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
-import resolve
+def get_resolve():
+    import resolve as _r
+
+    return _r
 
 
 def test_describe_prefers_uia_when_visible(monkeypatch):
+    resolve = get_resolve()
     app = {}
-    element = {"bounds": {"left": 0, "top": 0, "right": 100, "bottom": 100}, "is_offscreen": False}
-    monkeypatch.setattr(resolve, "get_element_info", lambda x, y: (app, element, "uia_text", 0.9))
-    monkeypatch.setattr(resolve, "capture_around", lambda pos, bounds=None: ("img", (0, 0, 0, 0)))
+    element = {
+        "bounds": {"left": 0, "top": 0, "right": 100, "bottom": 100},
+        "is_offscreen": False,
+    }
+    monkeypatch.setattr(
+        resolve, "get_element_info", lambda x, y: (app, element, "uia_text", 0.9)
+    )
+    monkeypatch.setattr(
+        resolve, "capture_around", lambda pos, bounds=None: ("img", (0, 0, 0, 0))
+    )
     monkeypatch.setattr(resolve, "extract_text", lambda img: ("ocr_text", 0.5))
     result = resolve.describe_under_cursor(10, 10)
     assert result["text"]["chosen"] == "uia_text"
@@ -39,10 +47,18 @@ def test_describe_prefers_uia_when_visible(monkeypatch):
 
 
 def test_describe_prefers_ocr_when_offscreen(monkeypatch):
+    resolve = get_resolve()
     app = {}
-    element = {"bounds": {"left": 0, "top": 0, "right": 100, "bottom": 100}, "is_offscreen": True}
-    monkeypatch.setattr(resolve, "get_element_info", lambda x, y: (app, element, "uia_text", 0.9))
-    monkeypatch.setattr(resolve, "capture_around", lambda pos, bounds=None: ("img", (0, 0, 0, 0)))
+    element = {
+        "bounds": {"left": 0, "top": 0, "right": 100, "bottom": 100},
+        "is_offscreen": True,
+    }
+    monkeypatch.setattr(
+        resolve, "get_element_info", lambda x, y: (app, element, "uia_text", 0.9)
+    )
+    monkeypatch.setattr(
+        resolve, "capture_around", lambda pos, bounds=None: ("img", (0, 0, 0, 0))
+    )
     monkeypatch.setattr(resolve, "extract_text", lambda img: ("ocr_text", 0.5))
     result = resolve.describe_under_cursor(10, 10)
     assert result["text"]["chosen"] == "ocr_text"
@@ -50,6 +66,7 @@ def test_describe_prefers_ocr_when_offscreen(monkeypatch):
 
 
 def test_ids_and_cache(monkeypatch):
+    resolve = get_resolve()
     monkeypatch.setattr(resolve, "RUNTIME_SALT", "salt")
     ancestors = [
         {"control_type": "Window", "name": "Main"},
@@ -63,14 +80,22 @@ def test_ids_and_cache(monkeypatch):
         "affordances": {"editable": True},
         "ancestors": ancestors,
     }
-    monkeypatch.setattr(resolve, "get_element_info", lambda x, y: (app, element, "uia", 0.9))
-    monkeypatch.setattr(resolve, "capture_around", lambda pos, bounds=None: ("img", (0, 0, 0, 0)))
+    monkeypatch.setattr(
+        resolve, "get_element_info", lambda x, y: (app, element, "uia", 0.9)
+    )
+    monkeypatch.setattr(
+        resolve, "capture_around", lambda pos, bounds=None: ("img", (0, 0, 0, 0))
+    )
     monkeypatch.setattr(resolve, "extract_text", lambda img: ("ocr", 0.5))
     result = resolve.describe_under_cursor(0, 0)
     window_path = "/Window:Main"
     control_path = "/Window:Main/Pane:Content/Edit:Input"
-    expected_window_id = hashlib.sha256(f"123|{window_path}|salt".encode()).hexdigest()[:16]
-    expected_control_id = hashlib.sha256(f"123|{control_path}|salt".encode()).hexdigest()[:16]
+    expected_window_id = hashlib.sha256(f"123|{window_path}|salt".encode()).hexdigest()[
+        :16
+    ]
+    expected_control_id = hashlib.sha256(
+        f"123|{control_path}|salt".encode()
+    ).hexdigest()[:16]
     assert result["window_id"] == expected_window_id
     assert result["control_id"] == expected_control_id
     assert resolve.ID_CACHE["last_window_id"] == expected_window_id
@@ -78,10 +103,18 @@ def test_ids_and_cache(monkeypatch):
 
 
 def test_error_capture(monkeypatch):
+    resolve = get_resolve()
     app = {}
-    element = {"bounds": {"left": 0, "top": 0, "right": 100, "bottom": 100}, "is_offscreen": False}
-    monkeypatch.setattr(resolve, "get_element_info", lambda x, y: (app, element, "uia_text", 0.9))
-    monkeypatch.setattr(resolve, "capture_around", lambda pos, bounds=None: ("img", (0, 0, 0, 0)))
+    element = {
+        "bounds": {"left": 0, "top": 0, "right": 100, "bottom": 100},
+        "is_offscreen": False,
+    }
+    monkeypatch.setattr(
+        resolve, "get_element_info", lambda x, y: (app, element, "uia_text", 0.9)
+    )
+    monkeypatch.setattr(
+        resolve, "capture_around", lambda pos, bounds=None: ("img", (0, 0, 0, 0))
+    )
 
     def boom(img):
         raise ValueError("fail")
@@ -92,6 +125,7 @@ def test_error_capture(monkeypatch):
 
 
 def test_describe_uses_get_position_when_coords_missing(monkeypatch):
+    resolve = get_resolve()
     called = {"count": 0}
 
     def fake_get_position():
@@ -99,10 +133,17 @@ def test_describe_uses_get_position_when_coords_missing(monkeypatch):
         return {"x": 5, "y": 6}
 
     app = {}
-    element = {"bounds": {"left": 0, "top": 0, "right": 10, "bottom": 10}, "is_offscreen": False}
+    element = {
+        "bounds": {"left": 0, "top": 0, "right": 10, "bottom": 10},
+        "is_offscreen": False,
+    }
     monkeypatch.setattr(resolve, "get_position", fake_get_position)
-    monkeypatch.setattr(resolve, "get_element_info", lambda x, y: (app, element, "uia", 0.9))
-    monkeypatch.setattr(resolve, "capture_around", lambda pos, bounds=None: ("img", (0, 0, 0, 0)))
+    monkeypatch.setattr(
+        resolve, "get_element_info", lambda x, y: (app, element, "uia", 0.9)
+    )
+    monkeypatch.setattr(
+        resolve, "capture_around", lambda pos, bounds=None: ("img", (0, 0, 0, 0))
+    )
     monkeypatch.setattr(resolve, "extract_text", lambda img: ("ocr", 0.5))
     result = resolve.describe_under_cursor()
     assert called["count"] == 1

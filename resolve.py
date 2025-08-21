@@ -1,4 +1,7 @@
-from typing import Dict, Tuple
+from __future__ import annotations
+
+from typing import Any, Dict, Mapping, Tuple
+from primitives import Bounds, Point
 import hashlib
 import secrets
 import time
@@ -25,7 +28,7 @@ def _hash_components(pid: int, path: str) -> str:
     return hashlib.sha256(data).hexdigest()[:16]
 
 
-def _compute_ids(app: Dict, element: Dict) -> Tuple[str, str]:
+def _compute_ids(app: Dict[str, Any], element: Dict[str, Any]) -> Tuple[str, str]:
     """Return stable window and control identifiers."""
     pid = app.get("pid")
     ancestors = element.get("ancestors") or []
@@ -47,12 +50,22 @@ def _compute_ids(app: Dict, element: Dict) -> Tuple[str, str]:
 
 
 @log_call
-def describe_under_cursor(x: int | None = None, y: int | None = None) -> Dict:
+def _bounds_dict(b: Mapping[str, int]) -> Bounds:
+    return {
+        "left": int(b["left"]),
+        "top": int(b["top"]),
+        "right": int(b["right"]),
+        "bottom": int(b["bottom"]),
+        **({"monitor": b.get("monitor")} if "monitor" in b else {}),
+    }  # type: ignore[index]
+
+
+def describe_under_cursor(x: int | None = None, y: int | None = None) -> Dict[str, Any]:
     timings: Dict[str, Dict[str, float]] = {}
     errors: Dict[str, str] = {}
 
     if x is not None and y is not None:
-        pos = {"x": x, "y": y}
+        pos: Point = {"x": x, "y": y}
     else:
         # get_position
         start = time.time()
@@ -81,7 +94,11 @@ def describe_under_cursor(x: int | None = None, y: int | None = None) -> Dict:
     # capture_around
     start = time.time()
     log("capture_around.start", start)
-    bounds = element.get("bounds") if isinstance(element, dict) else None
+    b = element.get("bounds") if isinstance(element, dict) else None
+    if isinstance(b, Mapping) and {"left", "top", "right", "bottom"} <= b.keys():
+        bounds: Bounds | None = _bounds_dict(b)
+    else:
+        bounds = None
     try:
         img, _ = capture_around(pos, bounds=bounds)
         log("capture_around.end", start)
@@ -108,7 +125,9 @@ def describe_under_cursor(x: int | None = None, y: int | None = None) -> Dict:
         ocr_text, ocr_conf = "", 0.0
     timings["extract_text"] = {"start": start, "end": time.time()}
 
-    visible = element.get("is_offscreen") is False if isinstance(element, dict) else False
+    visible = (
+        element.get("is_offscreen") is False if isinstance(element, dict) else False
+    )
     window_id, control_id = _compute_ids(app, element)
     app["window_id"] = window_id
     element["control_id"] = control_id

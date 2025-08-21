@@ -22,20 +22,42 @@ def get_element_info(x: int, y: int) -> Tuple[Dict, Dict, str, float]:
     """
 
     if UIAElementInfo is None:  # pragma: no cover - pywinauto missing
-        return ({"pid": None, "exe": None, "window_title": None},
-                {"control_type": None, "bounds": None, "automation_id": None,
-                 "name": None, "is_enabled": None, "is_offscreen": None,
-                 "patterns": [], "affordances": {}, "ancestors": []},
-                "", 0.0)
+        return (
+            {"pid": None, "exe": None, "window_title": None},
+            {
+                "control_type": None,
+                "bounds": None,
+                "automation_id": None,
+                "name": None,
+                "is_enabled": None,
+                "is_offscreen": None,
+                "patterns": [],
+                "affordances": {},
+                "ancestors": [],
+            },
+            "",
+            0.0,
+        )
 
     try:
         info = UIAElementInfo.from_point((x, y))
     except Exception:
-        return ({"pid": None, "exe": None, "window_title": None},
-                {"control_type": None, "bounds": None, "automation_id": None,
-                 "name": None, "is_enabled": None, "is_offscreen": None,
-                 "patterns": [], "affordances": {}, "ancestors": []},
-                "", 0.0)
+        return (
+            {"pid": None, "exe": None, "window_title": None},
+            {
+                "control_type": None,
+                "bounds": None,
+                "automation_id": None,
+                "name": None,
+                "is_enabled": None,
+                "is_offscreen": None,
+                "patterns": [],
+                "affordances": {},
+                "ancestors": [],
+            },
+            "",
+            0.0,
+        )
 
     bounds = {
         "left": info.rectangle.left,
@@ -73,8 +95,9 @@ def get_element_info(x: int, y: int) -> Tuple[Dict, Dict, str, float]:
     except Exception:
         pattern_ids = []
     if uia_defines is not None:
-        patterns = [uia_defines.pattern_id_to_name.get(pid, str(pid))
-                    for pid in pattern_ids]
+        patterns = [
+            uia_defines.pattern_id_to_name.get(pid, str(pid)) for pid in pattern_ids
+        ]
     else:  # pragma: no cover - uia_defines absent
         patterns = [str(pid) for pid in pattern_ids]
 
@@ -93,11 +116,13 @@ def get_element_info(x: int, y: int) -> Tuple[Dict, Dict, str, float]:
     while current is not None:
         ctype = getattr(current, "control_type", None)
         prefix = "W" if ctype == "Window" else "C"
-        ancestors.append({
-            "id": f"{prefix}{counter}",
-            "control_type": ctype or "",
-            "name": current.name or "",
-        })
+        ancestors.append(
+            {
+                "id": f"{prefix}{counter}",
+                "control_type": ctype or "",
+                "name": current.name or "",
+            }
+        )
         counter += 1
         try:
             parent = current.get_parent()

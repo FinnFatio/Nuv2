@@ -1,5 +1,7 @@
-from typing import Tuple
-from PIL import Image
+from __future__ import annotations
+
+from typing import Any, Dict, Tuple
+from PIL.Image import Image as PILImage
 import pytesseract
 from logger import log_call
 from settings import OCR_LANG, OCR_CFG, TESSERACT_CMD
@@ -19,10 +21,10 @@ if TESSERACT_CMD:
 
 
 @log_call
-def extract_text(image: Image) -> Tuple[str, float]:
+def extract_text(image: PILImage) -> Tuple[str, float]:
     """Run OCR on the given image, returning text and confidence."""
     try:
-        data = pytesseract.image_to_data(
+        data: Dict[str, Any] = pytesseract.image_to_data(
             image,
             output_type=pytesseract.Output.DICT,
             lang=OCR_LANG,

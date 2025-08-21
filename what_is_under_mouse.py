@@ -3,7 +3,7 @@ import ctypes
 
 from resolve import describe_under_cursor
 from logger import setup, COMPONENT
-from cli import emit_cli_json
+from cli_helpers import emit_cli_json
 
 
 def main(argv=None):
@@ -27,8 +27,7 @@ def main(argv=None):
     try:
         result = describe_under_cursor()
     except Exception as e:
-        data = {"error": {"code": str(e), "message": str(e)}}
-        emit_cli_json(data, 1)
+        emit_cli_json({"code": str(e), "message": str(e)}, 1)
     else:
         emit_cli_json(result, 0)
 
