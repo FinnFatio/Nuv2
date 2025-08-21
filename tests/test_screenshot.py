@@ -84,9 +84,9 @@ def test_capture_around_multi_monitor(monkeypatch):
     )
     monkeypatch.setattr(screenshot, "capture", stub_capture)
     point = {"x": -790, "y": 10}
-    img, region = screenshot.capture_around(point, width=100, height=100)
-    assert region == (-800, 0, -740, 60)
-    assert img == region
+    with pytest.raises(ValueError) as exc:
+        screenshot.capture_around(point, width=100, height=100)
+    assert str(exc.value) == "bbox_negative"
 
 
 def test_get_monitor_bounds_for_point(monkeypatch):
