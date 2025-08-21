@@ -76,6 +76,7 @@ async def add_request_id_and_rate_limit(request: Request, call_next):
         metrics.record_request(request.url.path, True)
         envelope = error_response("rate_limit", "rate limit exceeded")
         response = JSONResponse(envelope, status_code=429)
+        response.headers["Retry-After"] = "60"
         response.headers["X-Request-Id"] = request_id
         REQUEST_ID.set(None)
         return response
