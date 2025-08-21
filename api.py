@@ -21,6 +21,7 @@ if "" in sys.path:
     sys.path.append("")
 from fastapi import FastAPI, Query, Request
 from fastapi.responses import JSONResponse, StreamingResponse, Response
+from pydantic import BaseModel, Field
 from fastapi.middleware.cors import CORSMiddleware
 from collections import defaultdict, deque
 import time
@@ -31,13 +32,19 @@ from primitives import Bounds, ErrorEnvelope, ErrorInfo, OkEnvelope
 from logger import setup, log_call as _log_call, REQUEST_ID, COMPONENT
 import metrics
 import uuid
+from dispatcher import dispatch
+from registry import REGISTRY
+import tools
 from settings import (
     SNAPSHOT_MAX_AREA,
     SNAPSHOT_MAX_SIDE,
     API_RATE_LIMIT_PER_MIN,
     API_CORS_ORIGINS,
     TRUST_PROXY,
+    API_KEY,
 )
+
+tools.register_all_tools()
 
 P = ParamSpec("P")
 T = TypeVar("T")
@@ -59,6 +66,7 @@ if API_CORS_ORIGINS:
     )
 
 API_VERSION = "v1"
+MAX_TOOL_CALL_BYTES = 256 * 1024
 
 
 def ok_response(data: Dict[str, Any], version: str = API_VERSION) -> OkEnvelope:
@@ -70,6 +78,16 @@ def error_response(
 ) -> ErrorEnvelope:
     err: ErrorInfo = {"code": code, "message": message}
     return {"ok": False, "error": err, "meta": {"version": version}}
+
+
+def _require_api_key(request: Request) -> JSONResponse | None:
+    if not API_KEY:
+        return None
+    if request.headers.get("X-API-Key") != API_KEY:
+        return JSONResponse(
+            error_response("unauthorized", "invalid api key"), status_code=401
+        )
+    return None
 
 
 ELEMENT_CACHE: Dict[str, Dict[str, Any]] = {}
@@ -213,3 +231,65 @@ def healthz() -> JSONResponse:
 def get_metrics() -> JSONResponse:
     """Return aggregated latency, fallback and error information."""
     return JSONResponse(ok_response(metrics.summary()))
+
+
+class ToolCallModel(BaseModel):  # type: ignore[misc]
+    name: str
+    args: Dict[str, Any] = Field(default_factory=dict)
+
+
+@app.get("/v1/tools.list")
+def tools_list(request: Request) -> JSONResponse:
+    auth = _require_api_key(request)
+    if auth:
+        return auth
+    cards = [
+        {
+            "name": spec["name"],
+            "version": spec["version"],
+            "summary": spec["summary"],
+            "safety": spec["safety"],
+            "enabled_in_safe_mode": spec.get("enabled_in_safe_mode", False),
+        }
+        for spec in REGISTRY.values()
+    ]
+    return JSONResponse(ok_response({"tools": cards}))
+
+
+@app.post("/v1/tools.call")
+def tools_call(body: ToolCallModel, request: Request) -> JSONResponse:
+    req_id = REQUEST_ID.get()
+    auth = _require_api_key(request)
+    if auth:
+        auth.headers["X-Request-Id"] = req_id
+        return auth
+    if int(request.headers.get("content-length", "0")) > MAX_TOOL_CALL_BYTES:
+        r = JSONResponse(
+            error_response("bad_args", "request too large"), status_code=400
+        )
+        r.headers["X-Request-Id"] = req_id
+        return r
+    res = dispatch({"name": body.name, "args": body.args}, request_id=req_id)
+    http = (
+        200
+        if res["kind"] == "ok"
+        else (
+            429
+            if res.get("code") == "rate_limit"
+            else 403
+            if res.get("code") == "forbidden"
+            else 400
+            if res.get("code") in {"bad_args", "not_found"}
+            else 504
+            if res.get("code") == "timeout"
+            else 500
+        )
+    )
+    j = (
+        res
+        if res["kind"] == "ok"
+        else error_response(res.get("code", "tool_error"), res.get("error", ""))
+    )
+    r = JSONResponse(j, status_code=http)
+    r.headers["X-Request-Id"] = req_id
+    return r

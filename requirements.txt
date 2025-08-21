@@ -7,3 +7,4 @@ psutil
 httpx
 pygetwindow  # optional
 uvicorn
+requests
