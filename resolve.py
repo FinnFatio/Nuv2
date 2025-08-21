@@ -50,14 +50,16 @@ def _compute_ids(app: Dict[str, Any], element: Dict[str, Any]) -> Tuple[str, str
 
 
 @log_call
-def _bounds_dict(b: Mapping[str, int]) -> Bounds:
-    return {
+def _bounds_dict(b: Mapping[str, int | str]) -> Bounds:
+    bounds: Bounds = {
         "left": int(b["left"]),
         "top": int(b["top"]),
         "right": int(b["right"]),
         "bottom": int(b["bottom"]),
-        **({"monitor": b.get("monitor")} if "monitor" in b else {}),
-    }  # type: ignore[index]
+    }
+    if "monitor" in b:
+        bounds["monitor"] = str(b["monitor"])
+    return bounds
 
 
 def describe_under_cursor(x: int | None = None, y: int | None = None) -> Dict[str, Any]:
