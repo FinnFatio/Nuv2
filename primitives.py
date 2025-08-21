@@ -32,6 +32,25 @@ class Bounds(TypedDict):
     monitor: NotRequired[str]
 
 
+class UIAWindowInfo(TypedDict, total=False):
+    handle: int
+    active: bool
+    pid: int
+    title: str
+    app_path: str
+    bounds: Bounds
+
+
+class UIAElementInfo(TypedDict, total=False):
+    control_type: str
+    role: str
+    name: str
+    value: str
+    enabled: bool
+    offscreen: bool
+    bounds: Bounds
+
+
 class GrabResult(Protocol):
     size: Tuple[int, int]
     rgb: bytes
@@ -54,4 +73,13 @@ class OkEnvelope(TypedDict):
     meta: Dict[str, Any]
 
 
-__all__ = ["Point", "Bounds", "GrabResult", "ErrorInfo", "ErrorEnvelope", "OkEnvelope"]
+__all__ = [
+    "Point",
+    "Bounds",
+    "UIAWindowInfo",
+    "UIAElementInfo",
+    "GrabResult",
+    "ErrorInfo",
+    "ErrorEnvelope",
+    "OkEnvelope",
+]

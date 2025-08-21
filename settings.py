@@ -14,7 +14,7 @@ DEFAULTS: dict[str, Any] = {
     "OCR_CFG": "--oem 3 --psm 6",
     "CAPTURE_WIDTH": 300,
     "CAPTURE_HEIGHT": 120,
-    "UIA_THRESHOLD": 0.7,
+    "UIA_THRESHOLD": 4.0,
     "TESSERACT_CMD": None,
     "CAPTURE_LOG_SAMPLE_RATE": 0.1,
     "CAPTURE_LOG_DEST": "stderr",
@@ -26,6 +26,8 @@ DEFAULTS: dict[str, Any] = {
     "API_CORS_ORIGINS": "",
     "TRUST_PROXY": False,
     "SAFE_MODE": True,
+    "HOVER_WATCH_HZ": 1.0,
+    "HOVER_WATCH_RUN_AS_ADMIN": False,
 }
 
 CONFIG_SOURCES: dict[str, str] = {}
@@ -88,7 +90,7 @@ def load_settings() -> dict[str, Any]:
             cfg[key] = DEFAULTS[key]
             origins[key] = "default"
 
-    for key in ("UIA_THRESHOLD", "CAPTURE_LOG_SAMPLE_RATE"):
+    for key in ("UIA_THRESHOLD", "CAPTURE_LOG_SAMPLE_RATE", "HOVER_WATCH_HZ"):
         try:
             cfg[key] = float(cfg[key])
         except Exception:
@@ -124,6 +126,12 @@ def load_settings() -> dict[str, Any]:
         "on",
     }
     cfg["SAFE_MODE"] = str(cfg["SAFE_MODE"]).lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    cfg["HOVER_WATCH_RUN_AS_ADMIN"] = str(cfg["HOVER_WATCH_RUN_AS_ADMIN"]).lower() in {
         "1",
         "true",
         "yes",
@@ -180,3 +188,5 @@ API_RATE_LIMIT_PER_MIN = CONFIG["API_RATE_LIMIT_PER_MIN"]
 API_CORS_ORIGINS = CONFIG["API_CORS_ORIGINS"]
 TRUST_PROXY = CONFIG["TRUST_PROXY"]
 SAFE_MODE = CONFIG["SAFE_MODE"]
+HOVER_WATCH_HZ = CONFIG["HOVER_WATCH_HZ"]
+HOVER_WATCH_RUN_AS_ADMIN = CONFIG["HOVER_WATCH_RUN_AS_ADMIN"]

@@ -8,7 +8,7 @@ Opções podem ser fornecidas via variáveis de ambiente, arquivo `.env` ou arqu
 - `OCR_CFG` – string de configuração extra para o Tesseract (padrão: `--oem 3 --psm 6`)
 - `CAPTURE_WIDTH` – largura da região de captura (padrão: `300`)
 - `CAPTURE_HEIGHT` – altura da região de captura (padrão: `120`)
-- `UIA_THRESHOLD` – limiar de confiança para preferir texto de UIA (padrão: `0.7`)
+- `UIA_THRESHOLD` – limiar da heurística de texto da UIA (padrão: `4.0`)
 - `TESSERACT_CMD` – caminho para o executável do Tesseract, caso não esteja no `PATH`
 - `CAPTURE_LOG_SAMPLE_RATE` – proporção de capturas que geram log (padrão: `0.1`)
 - `CAPTURE_LOG_DEST` – destino dos logs de captura (`stderr` ou `file:caminho`)

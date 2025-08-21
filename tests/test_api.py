@@ -25,7 +25,7 @@ api, logger = get_api_logger()
 def fake_describe_under_cursor(x=None, y=None):
     return {
         "cursor": {"x": 1, "y": 2},
-        "app": {},
+        "window": {},
         "element": {
             "bounds": {"left": 0, "top": 0, "right": 1, "bottom": 1},
             "patterns": ["ValuePattern"],

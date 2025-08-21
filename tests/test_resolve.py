@@ -22,13 +22,17 @@ def get_resolve():
 
 def test_describe_prefers_uia_when_visible(monkeypatch):
     resolve = get_resolve()
-    app = {}
+    window = {}
     element = {
         "bounds": {"left": 0, "top": 0, "right": 100, "bottom": 100},
         "is_offscreen": False,
+        "is_enabled": True,
+        "control_type": "Edit",
+        "name": "foo",
+        "value": "uia_text",
     }
     monkeypatch.setattr(
-        resolve, "get_element_info", lambda x, y: (app, element, "uia_text", 0.9)
+        resolve, "get_element_info", lambda x, y: (window, element, "uia_text", 0.9)
     )
     monkeypatch.setattr(
         resolve, "capture_around", lambda pos, bounds=None: ("img", (0, 0, 0, 0))
@@ -48,13 +52,17 @@ def test_describe_prefers_uia_when_visible(monkeypatch):
 
 def test_describe_prefers_ocr_when_offscreen(monkeypatch):
     resolve = get_resolve()
-    app = {}
+    window = {}
     element = {
         "bounds": {"left": 0, "top": 0, "right": 100, "bottom": 100},
         "is_offscreen": True,
+        "is_enabled": True,
+        "control_type": "Edit",
+        "name": "fo",
+        "value": "",
     }
     monkeypatch.setattr(
-        resolve, "get_element_info", lambda x, y: (app, element, "uia_text", 0.9)
+        resolve, "get_element_info", lambda x, y: (window, element, "uia_text", 0.9)
     )
     monkeypatch.setattr(
         resolve, "capture_around", lambda pos, bounds=None: ("img", (0, 0, 0, 0))
@@ -73,7 +81,14 @@ def test_ids_and_cache(monkeypatch):
         {"control_type": "Pane", "name": "Content"},
         {"control_type": "Edit", "name": "Input"},
     ]
-    app = {"pid": 123, "exe": "app.exe", "window_title": "Main"}
+    window = {
+        "pid": 123,
+        "title": "Main",
+        "app_path": "app.exe",
+        "handle": 1,
+        "active": True,
+        "bounds": None,
+    }
     element = {
         "bounds": {"left": 0, "top": 0, "right": 100, "bottom": 100},
         "is_offscreen": False,
@@ -81,7 +96,7 @@ def test_ids_and_cache(monkeypatch):
         "ancestors": ancestors,
     }
     monkeypatch.setattr(
-        resolve, "get_element_info", lambda x, y: (app, element, "uia", 0.9)
+        resolve, "get_element_info", lambda x, y: (window, element, "uia", 0.9)
     )
     monkeypatch.setattr(
         resolve, "capture_around", lambda pos, bounds=None: ("img", (0, 0, 0, 0))
@@ -104,13 +119,13 @@ def test_ids_and_cache(monkeypatch):
 
 def test_error_capture(monkeypatch):
     resolve = get_resolve()
-    app = {}
+    window = {}
     element = {
         "bounds": {"left": 0, "top": 0, "right": 100, "bottom": 100},
         "is_offscreen": False,
     }
     monkeypatch.setattr(
-        resolve, "get_element_info", lambda x, y: (app, element, "uia_text", 0.9)
+        resolve, "get_element_info", lambda x, y: (window, element, "uia_text", 0.9)
     )
     monkeypatch.setattr(
         resolve, "capture_around", lambda pos, bounds=None: ("img", (0, 0, 0, 0))
@@ -132,14 +147,14 @@ def test_describe_uses_get_position_when_coords_missing(monkeypatch):
         called["count"] += 1
         return {"x": 5, "y": 6}
 
-    app = {}
+    window = {}
     element = {
         "bounds": {"left": 0, "top": 0, "right": 10, "bottom": 10},
         "is_offscreen": False,
     }
     monkeypatch.setattr(resolve, "get_position", fake_get_position)
     monkeypatch.setattr(
-        resolve, "get_element_info", lambda x, y: (app, element, "uia", 0.9)
+        resolve, "get_element_info", lambda x, y: (window, element, "uia", 0.9)
     )
     monkeypatch.setattr(
         resolve, "capture_around", lambda pos, bounds=None: ("img", (0, 0, 0, 0))

@@ -16,6 +16,8 @@ _route_total: Counter[str] = Counter()
 _route_errors: Counter[str] = Counter()
 _route_status: Counter[Tuple[str, int]] = Counter()
 _rate_limited_total = 0
+_gauges: Dict[str, int | float] = {}
+_enums: Dict[str, Counter[str]] = {}
 
 
 def record_time(kind: str, elapsed_ms: int) -> None:
@@ -26,6 +28,14 @@ def record_time(kind: str, elapsed_ms: int) -> None:
 
 def record_fallback(name: str) -> None:
     _fallbacks[name] += 1
+
+
+def record_gauge(name: str, value: int | float) -> None:
+    _gauges[name] = value
+
+
+def record_enum(name: str, value: str) -> None:
+    _enums.setdefault(name, Counter())[value] += 1
 
 
 def record_request(route: str, status: int) -> None:
@@ -70,6 +80,8 @@ def summary() -> Dict:
         "status_total": status_total,
         "rate_limited_total": _rate_limited_total,
         "resets_total": _fallbacks.get("resets", 0),
+        "gauges": dict(_gauges),
+        "enums": {k: dict(v) for k, v in _enums.items()},
     }
 
 
@@ -80,5 +92,7 @@ def reset() -> None:
     _route_total.clear()
     _route_errors.clear()
     _route_status.clear()
+    _gauges.clear()
+    _enums.clear()
     global _rate_limited_total
     _rate_limited_total = 0
