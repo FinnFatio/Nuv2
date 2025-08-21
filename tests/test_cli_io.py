@@ -17,7 +17,7 @@ def fake_capture(region):
     return DummyImg()
 
 screenshot.capture = fake_capture
-sys.argv = ["screenshot.py", "--json", "--region", "0,0,1,1", "{out}"]
+sys.argv = ["screenshot.py", "--json", "--region", "0,0,1,1", r"{out}"]
 screenshot.main()
 """
     env = os.environ.copy()
@@ -49,7 +49,7 @@ def fake_capture(region):
     return DummyImg()
 
 screenshot.capture = fake_capture
-sys.argv = ["screenshot.py", "--json", "--region", "0,0,1,1", "{out}"]
+sys.argv = ["screenshot.py", "--json", "--region", "0,0,1,1", r"{out}"]
 screenshot.main()
 """
     env = os.environ.copy()
@@ -75,7 +75,7 @@ def test_log_to_file_doesnt_pollute_stdout(tmp_path):
     script = f"""
 import screenshot
 screenshot.CAPTURE_LOG_SAMPLE_RATE = 1
-screenshot.CAPTURE_LOG_DEST = "file:{log}"
+screenshot.CAPTURE_LOG_DEST = r"file:{log}"
 screenshot._log_sampled({{"stage":"test"}})
 """
     result = subprocess.run(

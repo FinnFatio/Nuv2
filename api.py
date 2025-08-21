@@ -36,6 +36,7 @@ from settings import (
     SNAPSHOT_MAX_SIDE,
     API_RATE_LIMIT_PER_MIN,
     API_CORS_ORIGINS,
+    TRUST_PROXY,
 )
 
 P = ParamSpec("P")
@@ -86,12 +87,16 @@ async def add_request_id_and_rate_limit(
     request_id = request.headers.get("X-Request-Id") or uuid.uuid4().hex
     token: Token[str] = REQUEST_ID.set(request_id)
     ip = request.client.host if request.client else "unknown"
+    if TRUST_PROXY:
+        forwarded = request.headers.get("X-Forwarded-For")
+        if forwarded:
+            ip = forwarded.split(",")[0].strip()
     now = time.time()
     dq = _REQUEST_LOG[ip]
     while dq and now - dq[0] > 60:
         dq.popleft()
     if len(dq) >= API_RATE_LIMIT_PER_MIN:
-        metrics.record_request(request.url.path, True)
+        metrics.record_request(request.url.path, 429)
         envelope = error_response("rate_limit", "rate limit exceeded")
         response = JSONResponse(envelope, status_code=429)
         response.headers["Retry-After"] = "60"
@@ -101,7 +106,7 @@ async def add_request_id_and_rate_limit(
     dq.append(now)
     try:
         response = await call_next(request)
-        metrics.record_request(request.url.path, response.status_code >= 400)
+        metrics.record_request(request.url.path, response.status_code)
         response.headers["X-Request-Id"] = request_id
         return response
     finally:
@@ -200,10 +205,7 @@ def healthz() -> JSONResponse:
     return JSONResponse(ok_response(screenshot.health_check()))
 
 
-@app.head("/healthz")
-def healthz_head() -> Response:
-    # HEAD deve retornar 200 com corpo vazio
-    return Response(status_code=200)
+app.head("/healthz")(healthz)
 
 
 @app.get("/metrics")

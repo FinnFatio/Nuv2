@@ -25,8 +25,8 @@ def test_metrics_endpoint(monkeypatch):
     metrics.record_time("cursor", 20)
     metrics.record_time("cursor", 30)
     metrics.record_fallback("used_ocr")
-    metrics.record_request("/inspect", False)
-    metrics.record_request("/inspect", True)
+    metrics.record_request("/inspect", 200)
+    metrics.record_request("/inspect", 429)
     client = TestClient(api.app)
     resp = client.get("/metrics")
     assert resp.status_code == 200
@@ -35,3 +35,5 @@ def test_metrics_endpoint(monkeypatch):
     assert data["latency_ms"]["cursor"]["p95"] == 30
     assert data["fallbacks"]["used_ocr"] == 1
     assert data["error_rate"]["/inspect"] == 0.5
+    assert data["status_total"]["/inspect"]["429"] == 1
+    assert data["rate_limited_total"] == 1
