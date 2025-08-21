@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from typing import Dict, Optional, Tuple
-from primitives import Bounds, GrabResult, Point
+from typing import Any, Dict, Optional, Tuple, cast
+from primitives import Bounds, GrabResult, Point, MonitorDict
 
 import json
 import time
@@ -95,11 +95,11 @@ def get_screen_bounds() -> Tuple[int, int, int, int]:
     """Return the bounding box of all monitors as (left, top, right, bottom)."""
     sct = _get_sct()
     try:
-        monitor = sct.monitors[0]
+        monitor: MonitorDict = cast(MonitorDict, sct.monitors[0])
     except Exception:
         _reset_sct("monitors_failed")
         sct = _get_sct()
-        monitor = sct.monitors[0]
+        monitor = cast(MonitorDict, sct.monitors[0])
     left = monitor["left"]
     top = monitor["top"]
     right = left + monitor["width"]
@@ -117,13 +117,13 @@ def get_monitor_bounds(label: str) -> Bounds:
     """Return bounds of monitor given its label (mon1|mon2|virtual)."""
     sct = _get_sct()
     try:
-        monitors = sct.monitors
+        monitors = cast(list[MonitorDict], sct.monitors)
     except Exception:
         _reset_sct("monitors_failed")
         sct = _get_sct()
-        monitors = sct.monitors
+        monitors = cast(list[MonitorDict], sct.monitors)
     if label == "virtual":
-        mon = monitors[0]
+        mon: MonitorDict = monitors[0]
     elif label.startswith("mon"):
         idx = int(label[3:])
         if idx <= 0 or idx >= len(monitors):
@@ -142,14 +142,14 @@ def health_check() -> Dict[str, object]:
     """Return basic capture bounds and latency information."""
     left, top, right, bottom = get_screen_bounds()
     sct = _get_sct()
-    monitor = {"left": left, "top": top, "width": 1, "height": 1}
+    monitor: MonitorDict = {"left": left, "top": top, "width": 1, "height": 1}
     start = time.perf_counter()
     try:
-        sct.grab(monitor)
+        sct.grab(cast(dict[str, int], monitor))
     except Exception:
         _reset_sct("monitors_failed")
         sct = _get_sct()
-        sct.grab(monitor)
+        sct.grab(cast(dict[str, int], monitor))
     latency_ms = int((time.perf_counter() - start) * 1000)
     return {
         "bounds": {"left": left, "top": top, "right": right, "bottom": bottom},
@@ -161,10 +161,11 @@ def health_check() -> Dict[str, object]:
 def capture(region: Optional[Tuple[int, int, int, int]] = None) -> Image.Image:
     """Capture a screenshot of the given region."""
     sct = _get_sct()
+    bounds: Bounds
     if region is not None:
         left, top, right, bottom = region
         _validate_bbox(left, top, right, bottom)
-        monitor: Dict[str, int] = {
+        monitor: MonitorDict = {
             "left": left,
             "top": top,
             "width": right - left,
@@ -173,24 +174,24 @@ def capture(region: Optional[Tuple[int, int, int, int]] = None) -> Image.Image:
         bounds = get_monitor_bounds_for_point((left + right) // 2, (top + bottom) // 2)
     else:
         try:
-            monitor = sct.monitors[0]  # type: ignore[index]
+            monitor = cast(MonitorDict, sct.monitors[0])
         except Exception:
             _reset_sct("monitors_failed")
             sct = _get_sct()
-            monitor = sct.monitors[0]  # type: ignore[index]
-        bounds: Bounds = {"monitor": "virtual"}
+            monitor = cast(MonitorDict, sct.monitors[0])
+        bounds = cast(Bounds, {"monitor": "virtual"})
     start = time.perf_counter()
     try:
-        screenshot = sct.grab(monitor)  # type: ignore[arg-type]
+        screenshot = sct.grab(cast(dict[str, int], monitor))
     except Exception:
         _reset_sct("monitors_failed")
         sct = _get_sct()
-        screenshot = sct.grab(monitor)  # type: ignore[arg-type]
+        screenshot = sct.grab(cast(dict[str, int], monitor))
     elapsed_ms = int((time.perf_counter() - start) * 1000)
     _log_sampled(
         {"time_capture_ms": elapsed_ms, "monitor": bounds.get("monitor", "unknown")}
     )
-    gr: GrabResult = screenshot  # type: ignore[assignment]
+    gr: GrabResult = screenshot
     return Image.frombytes("RGB", gr.size, gr.rgb)
 
 
@@ -202,11 +203,11 @@ def get_monitor_bounds_for_point(x: int, y: int) -> Bounds:
     """
     sct = _get_sct()
     try:
-        monitors = sct.monitors
+        monitors = cast(list[MonitorDict], sct.monitors)
     except Exception:
         _reset_sct("monitors_failed")
         sct = _get_sct()
-        monitors = sct.monitors
+        monitors = cast(list[MonitorDict], sct.monitors)
     for idx, mon in enumerate(monitors[1:], start=1):
         left = mon["left"]
         top = mon["top"]
@@ -269,17 +270,17 @@ def capture_around(
     return capture(region), region
 
 
-def _parse_region(arg: str) -> Dict[str, int]:
+def _parse_region(arg: str) -> MonitorDict:
     """Parse a region in the form x,y,w,h into a monitor dict."""
     x, y, w, h = map(int, arg.split(","))
     return {"left": x, "top": y, "width": w, "height": h}
 
 
-def _get_windows(gw, timeout: Optional[float]) -> list:
-    result = []
+def _get_windows(gw: Any, timeout: Optional[float]) -> list[Any]:
+    result: list[Any] = []
     exc: Exception | None = None
 
-    def worker():
+    def worker() -> None:
         nonlocal result, exc
         try:
             result = gw.getAllWindows()
@@ -322,7 +323,7 @@ def main() -> None:
     try:
         if args.region:
             try:
-                mon = _parse_region(args.region)
+                mon: MonitorDict = _parse_region(args.region)
             except Exception:
                 raise ValueError("invalid region")
             region = (
@@ -332,8 +333,8 @@ def main() -> None:
                 mon["top"] + mon["height"],
             )
         elif args.monitor:
-            mon = get_monitor_bounds(args.monitor)
-            region = (mon["left"], mon["top"], mon["right"], mon["bottom"])
+            mbounds = get_monitor_bounds(args.monitor)
+            region = (mbounds["left"], mbounds["top"], mbounds["right"], mbounds["bottom"])
         elif args.active or args.window:
             try:
                 import pygetwindow as gw
@@ -363,7 +364,7 @@ def main() -> None:
         msg = str(e)
         code_name = "invalid_region" if msg == "invalid region" else "bad_region"
         if args.json:
-            data = {"code": code_name, "message": msg}
+            data: Dict[str, object] = {"code": code_name, "message": msg}
             if code_name == "bad_region" and region is not None:
                 data["region"] = region
             emit_cli_json(data, 2)
