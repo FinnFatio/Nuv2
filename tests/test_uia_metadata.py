@@ -29,7 +29,7 @@ def test_uia_metadata_propagates(monkeypatch):
     monkeypatch.setattr(
         resolve, "capture_around", lambda pos, bounds=None: ("img", (0, 0, 0, 0))
     )
-    monkeypatch.setattr(resolve, "extract_text", lambda img: ("", 0.0))
+    monkeypatch.setattr(resolve, "extract_text", lambda img, region=None: ("", 0.0))
     info = resolve.describe_under_cursor(0, 0)
     assert "value" in info["element"]
     assert "handle" in info["window"]

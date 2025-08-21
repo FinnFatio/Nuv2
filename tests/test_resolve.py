@@ -37,10 +37,12 @@ def test_describe_prefers_uia_when_visible(monkeypatch):
     monkeypatch.setattr(
         resolve, "capture_around", lambda pos, bounds=None: ("img", (0, 0, 0, 0))
     )
-    monkeypatch.setattr(resolve, "extract_text", lambda img: ("ocr_text", 0.5))
+    monkeypatch.setattr(
+        resolve, "extract_text", lambda img, region=None: ("ocr_text", 0.5)
+    )
     result = resolve.describe_under_cursor(10, 10)
     assert result["text"]["chosen"] == "uia_text"
-    assert result["source"] == "uia"
+    assert result["text"]["source"] == "uia"
     # timings and errors
     for step in ["get_element_info", "capture_around", "extract_text"]:
         assert step in result["timings"]
@@ -67,10 +69,12 @@ def test_describe_prefers_ocr_when_offscreen(monkeypatch):
     monkeypatch.setattr(
         resolve, "capture_around", lambda pos, bounds=None: ("img", (0, 0, 0, 0))
     )
-    monkeypatch.setattr(resolve, "extract_text", lambda img: ("ocr_text", 0.5))
+    monkeypatch.setattr(
+        resolve, "extract_text", lambda img, region=None: ("ocr_text", 0.5)
+    )
     result = resolve.describe_under_cursor(10, 10)
     assert result["text"]["chosen"] == "ocr_text"
-    assert result["source"] == "ocr"
+    assert result["text"]["source"] == "ocr"
 
 
 def test_ids_and_cache(monkeypatch):
@@ -101,7 +105,7 @@ def test_ids_and_cache(monkeypatch):
     monkeypatch.setattr(
         resolve, "capture_around", lambda pos, bounds=None: ("img", (0, 0, 0, 0))
     )
-    monkeypatch.setattr(resolve, "extract_text", lambda img: ("ocr", 0.5))
+    monkeypatch.setattr(resolve, "extract_text", lambda img, region=None: ("ocr", 0.5))
     result = resolve.describe_under_cursor(0, 0)
     window_path = "/Window:Main"
     control_path = "/Window:Main/Pane:Content/Edit:Input"
@@ -131,7 +135,7 @@ def test_error_capture(monkeypatch):
         resolve, "capture_around", lambda pos, bounds=None: ("img", (0, 0, 0, 0))
     )
 
-    def boom(img):
+    def boom(img, region=None):
         raise ValueError("fail")
 
     monkeypatch.setattr(resolve, "extract_text", boom)
@@ -159,7 +163,7 @@ def test_describe_uses_get_position_when_coords_missing(monkeypatch):
     monkeypatch.setattr(
         resolve, "capture_around", lambda pos, bounds=None: ("img", (0, 0, 0, 0))
     )
-    monkeypatch.setattr(resolve, "extract_text", lambda img: ("ocr", 0.5))
+    monkeypatch.setattr(resolve, "extract_text", lambda img, region=None: ("ocr", 0.5))
     result = resolve.describe_under_cursor()
     assert called["count"] == 1
     assert result["cursor"] == {"x": 5, "y": 6}

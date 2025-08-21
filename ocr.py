@@ -30,9 +30,11 @@ def _ensure_tesseract() -> None:
 
 
 @log_call
-def extract_text(image: PILImage) -> Tuple[str, float]:
-    """Run OCR on the given image, returning text and confidence."""
+def extract_text(image: PILImage, region: Tuple[int, int, int, int] | None = None) -> Tuple[str, float]:
+    """Run OCR on ``image`` optionally cropped to ``region`` (left, top, right, bottom)."""
     _ensure_tesseract()
+    if region is not None:
+        image = image.crop(region)
     try:
         data: Dict[str, Any] = pytesseract.image_to_data(
             image,
