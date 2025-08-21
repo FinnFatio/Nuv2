@@ -66,8 +66,10 @@ def test_invalid_tesseract_cmd(monkeypatch):
 
     monkeypatch.setenv("TESSERACT_CMD", "nonexistent")
     importlib.reload(settings_module)
+    importlib.reload(ocr)
+    img = Image.new("RGB", (10, 10))
     with pytest.raises(RuntimeError) as exc:
-        importlib.reload(ocr)
+        ocr.extract_text(img)
     assert "tesseract_missing" in str(exc.value)
     monkeypatch.delenv("TESSERACT_CMD", raising=False)
     importlib.reload(settings_module)
