@@ -88,6 +88,22 @@ Os milestones M0–M3 representam a fundação: um **visor confiável**, enrique
     - `screenshot --active|--window "re"|--region x,y,w,h` → salva PNG.  
   **Prioridade:** P1 • **Size:** S
 
+ - [ ] **Etapa 3: Núcleo LLM (interno, sem HTTP)**
+  Arquivos: registry.py, dispatcher.py, policy.py, tools/system.py, tools/fs.py, tools/archive.py, tools/web.py, tests/test_dispatcher_tools.py
+  **DoD:**
+    - Registry (catálogo) com metadados das ferramentas (nome, versão, resumo, safety, timeout_ms, rate_limit_per_min, enabled_in_safe_mode).
+    - Dispatcher recebe {name, args}, valida, aplica timeout, rate-limit por ferramenta e SAFE_MODE, e retorna Envelope ok|error com code∈{bad_args,timeout,rate_limit,forbidden,- tool_error,not_found}.
+    - Policy mínima (código, não prompt): explain-first (conceitos → sem ferramentas), recência (notícias/preços) chama web.*, pedido explícito usa a tool pedida, baixa confiança permite 1 suporte (máx. 3 chamadas por turno).
+    - Adapters read-only (reuso do que já existe), com suporte a bounds e window_id/control_id (usando o cache da Etapa 1):
+    - system.capture_screen (wrap de screenshot.capture)
+    -system.ocr (wrap de ocr.extract_text)
+    -system.uia_query (wrap de uia/resolve)
+    -fs.list/read (allowlist e max_bytes)
+    - archive.list/read (.zip, read-only, limites)
+    - web.search/read (allowlist de domínios)
+    - Métricas: tool_calls_total{tool_name,outcome}, tool_latency_ms_bucket{tool_name}, policy_blocked_total{reason}.
+    - Testes e2e (sem LLM real) cobrindo: “entropia” (não usa web), “dólar hoje” (usa web.* e retorna data/fonte), “abrir ZIP e ler README” (read-only), SAFE_MODE bloqueando  - -  - escrita, bad_args/timeout/rate_limit com códigos estáveis.
+    - Prioridade: P0 • Size: M
 ---
 
 ## Milestone M3 — Runtime HTTP (ponte)
