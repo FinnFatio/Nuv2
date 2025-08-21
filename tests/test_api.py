@@ -2,6 +2,8 @@ import json
 import sys
 import types
 from fastapi.testclient import TestClient
+import tools
+import zipfile
 
 pytesseract_module = types.ModuleType("pytesseract")
 pytesseract_module.image_to_string = lambda *a, **k: ""
@@ -302,3 +304,101 @@ def test_request_id_logged(monkeypatch):
     assert resp.status_code == 200
     data = json.loads(cap.last)
     assert data["request_id"] == rid
+
+
+def test_tools_list_and_call(monkeypatch):
+    api.BOUNDS_CACHE.clear()
+    monkeypatch.setattr(api.screenshot, "capture", fake_capture)
+    monkeypatch.setattr(tools.system, "capture", fake_capture)
+    api.API_KEY = "secret"
+    client = TestClient(api.app)
+    resp = client.get("/v1/tools.list", headers={"X-API-Key": "secret"})
+    assert resp.status_code == 200
+    names = [t["name"] for t in resp.json()["data"]["tools"]]
+    assert "system.capture_screen" in names
+
+    resp = client.post(
+        "/v1/tools.call",
+        json={
+            "name": "system.capture_screen",
+            "args": {"bounds": {"left": 0, "top": 0, "right": 1, "bottom": 1}},
+        },
+        headers={"X-API-Key": "secret"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["kind"] == "ok"
+    api.API_KEY = ""
+
+
+def test_tools_call_web_and_archive(monkeypatch, tmp_path):
+    api.BOUNDS_CACHE.clear()
+    api.API_KEY = "secret"
+    client = TestClient(api.app)
+    resp = client.post(
+        "/v1/tools.call",
+        json={"name": "web.read", "args": {"url": "http://localhost"}},
+        headers={"X-API-Key": "secret"},
+    )
+    assert resp.status_code == 400
+
+    big = tmp_path / "b.zip"
+    with zipfile.ZipFile(big, "w") as z:
+        z.writestr("a.txt", "a" * (tools.archive.MAX_BYTES + 1))
+    resp = client.post(
+        "/v1/tools.call",
+        json={
+            "name": "archive.read",
+            "args": {
+                "path": str(big),
+                "inner_path": "a.txt",
+                "allow": [str(tmp_path)],
+            },
+        },
+        headers={"X-API-Key": "secret"},
+    )
+    assert resp.status_code == 400
+
+    traversal = tmp_path / "t.zip"
+    with zipfile.ZipFile(traversal, "w") as z:
+        z.writestr("../evil.txt", "x")
+    resp = client.post(
+        "/v1/tools.call",
+        json={
+            "name": "archive.read",
+            "args": {
+                "path": str(traversal),
+                "inner_path": "../evil.txt",
+                "allow": [str(tmp_path)],
+            },
+        },
+        headers={"X-API-Key": "secret"},
+    )
+    assert resp.status_code == 400
+    api.API_KEY = ""
+
+
+def test_tools_auth_required():
+    api.API_KEY = "secret"
+    client = TestClient(api.app)
+    resp = client.get("/v1/tools.list")
+    assert resp.status_code == 401
+    resp = client.get("/v1/tools.list", headers={"X-API-Key": "secret"})
+    assert resp.status_code == 200
+    api.API_KEY = ""
+
+
+def test_tools_call_payload_limit(tmp_path):
+    api.API_KEY = "secret"
+    client = TestClient(api.app)
+    payload = {
+        "name": "system.capture_screen",
+        "args": {"data": "x" * (api.MAX_TOOL_CALL_BYTES + 1)},
+    }
+    resp = client.post(
+        "/v1/tools.call",
+        data=json.dumps(payload),
+        headers={"X-API-Key": "secret", "Content-Type": "application/json"},
+    )
+    assert resp.status_code == 400
+    assert resp.json()["error"]["code"] == "bad_args"
+    api.API_KEY = ""
