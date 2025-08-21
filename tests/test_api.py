@@ -219,6 +219,7 @@ def test_rate_limit(monkeypatch):
     assert resp.status_code == 429
     data = resp.json()
     assert data["error"]["code"] == "rate_limit"
+    assert resp.headers["Retry-After"] == "60"
 
 
 def test_inspect_tesseract_error(monkeypatch):
