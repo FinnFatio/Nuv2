@@ -50,24 +50,24 @@ Os milestones M0–M3 representam a fundação: um **visor confiável**, enrique
 ## Milestone M1 — Visão útil (UIA rica + fusão decente)
 **Objetivo:** enriquecer metadados e escolher melhor entre UIA e OCR.
 
-- [ ] **Etapa 1: Enriquecer UIA (AutomationId, patterns, flags)**
-  Arquivo: `uia.py`  
-  **DoD:** JSON inclui `automation_id`, `name`, `value` (quando houver), `control_type`, `is_enabled`, `is_offscreen`, `patterns[]`, `window:{handle, active}`.  
+- [X] **Etapa 1: Enriquecer UIA (AutomationId, patterns, flags)**
+  Arquivo: `uia.py`
+  **DoD:** JSON inclui `automation_id`, `name`, `value` (quando houver), `control_type`, `is_enabled`, `is_offscreen`, `patterns[]`, `window:{handle, active}`.
   **Prioridade:** P0 • **Size:** M
 
 - [ ] **Etapa 2: OCR com recorte pelo elemento + heurística de fusão**
-  Arquivos: `resolve.py`, `ocr.py`, `screenshot.py`  
-  **DoD:** se há `bounds` do elemento, OCR recorta dentro; heurística usa `is_offscreen`, `control_type`, `value/name` para definir `text.chosen` e `text.source∈{uia,ocr}`; threshold em `settings.py`.  
+  Arquivos: `resolve.py`, `ocr.py`, `screenshot.py`
+  **DoD:** se há `bounds` do elemento, OCR recorta dentro; heurística usa `is_offscreen`, `control_type`, `value/name` para definir `text.chosen` e `text.source∈{uia,ocr}`; threshold em `settings.py`.
   **Prioridade:** P1 • **Size:** M
 
-- [ ] **Etapa 3: Telemetria consolidada**
-  Arquivos: `resolve.py`  
-  **DoD:** métricas agregadas: `time_cursor`, `time_uia`, `time_capture`, `time_ocr`; contadores de fallback (vezes que caiu em OCR).  
+- [X] **Etapa 3: Telemetria consolidada**
+  Arquivos: `resolve.py`
+  **DoD:** métricas agregadas: `time_cursor`, `time_uia`, `time_capture`, `time_ocr`; contadores de fallback (vezes que caiu em OCR).
   **Prioridade:** P1 • **Size:** S
 
-- [ ] **Etapa 4: Config externa centralizada**
-  Arquivos: `settings.py`  
-  **DoD:** `.env/config.json` controlam: idioma OCR, box padrão (W×H), thresholds, hz do `hover_watch`, flags `run_as_admin`, etc.  
+- [X] **Etapa 4: Config externa centralizada**
+  Arquivos: `settings.py`
+  **DoD:** `.env/config.json` controlam: idioma OCR, box padrão (W×H), thresholds, hz do `hover_watch`, flags `run_as_admin`, etc.
   **Prioridade:** P1 • **Size:** S
 
 ---
