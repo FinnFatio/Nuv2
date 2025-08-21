@@ -18,6 +18,9 @@ _route_status: Counter[Tuple[str, int]] = Counter()
 _rate_limited_total = 0
 _gauges: Dict[str, int | float] = {}
 _enums: Dict[str, Counter[str]] = {}
+_policy_blocked: Counter[str] = Counter()
+_tool_calls: Counter[Tuple[str, str]] = Counter()
+_tool_latency: Dict[str, Deque[int]] = {}
 
 
 def record_time(kind: str, elapsed_ms: int) -> None:
@@ -36,6 +39,15 @@ def record_gauge(name: str, value: int | float) -> None:
 
 def record_enum(name: str, value: str) -> None:
     _enums.setdefault(name, Counter())[value] += 1
+
+
+def record_policy_block(reason: str) -> None:
+    _policy_blocked[reason] += 1
+
+
+def record_tool_call(name: str, outcome: str, elapsed_ms: int) -> None:
+    _tool_calls[(name, outcome)] += 1
+    _tool_latency.setdefault(name, deque(maxlen=_WINDOW)).append(int(elapsed_ms))
 
 
 def record_request(route: str, status: int) -> None:
@@ -73,6 +85,13 @@ def summary() -> Dict:
     status_total: Dict[str, Dict[int, int]] = {}
     for (route, status), count in _route_status.items():
         status_total.setdefault(route, {})[status] = count
+    tool_latency = {
+        name: {"p50": _percentile(dq, 50), "p95": _percentile(dq, 95)}
+        for name, dq in _tool_latency.items()
+    }
+    tool_calls: Dict[str, Dict[str, int]] = {}
+    for (name, outcome), count in _tool_calls.items():
+        tool_calls.setdefault(name, {})[outcome] = count
     return {
         "latency_ms": latency,
         "fallbacks": dict(_fallbacks),
@@ -82,6 +101,9 @@ def summary() -> Dict:
         "resets_total": _fallbacks.get("resets", 0),
         "gauges": dict(_gauges),
         "enums": {k: dict(v) for k, v in _enums.items()},
+        "policy_blocked_total": dict(_policy_blocked),
+        "tool_calls_total": tool_calls,
+        "tool_latency_ms": tool_latency,
     }
 
 
@@ -96,3 +118,6 @@ def reset() -> None:
     _enums.clear()
     global _rate_limited_total
     _rate_limited_total = 0
+    _policy_blocked.clear()
+    _tool_calls.clear()
+    _tool_latency.clear()

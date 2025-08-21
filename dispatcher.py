@@ -25,13 +25,19 @@ def dispatch(
 
     start = time.time()
     if safe_mode and not tool["enabled_in_safe_mode"]:
-        metrics.record_enum("policy_block", name or "")
+        metrics.record_policy_block("safe_mode")
+        metrics.record_tool_call(
+            name or "", "forbidden", int((time.time() - start) * 1000)
+        )
         return {"kind": "error", "code": "forbidden", "error": "disabled in safe mode"}
 
     now = time.time()
     calls = _RATE_LIMITS.setdefault(name, [])
     calls[:] = [t for t in calls if now - t < 60]
     if tool["rate_limit_per_min"] and len(calls) >= tool["rate_limit_per_min"]:
+        metrics.record_tool_call(
+            name or "", "rate_limit", int((time.time() - start) * 1000)
+        )
         return {"kind": "error", "code": "rate_limit", "error": "rate limit exceeded"}
 
     result: Any | None = None
@@ -52,17 +58,15 @@ def dispatch(
     thread.daemon = True
     thread.start()
     thread.join(tool["timeout_ms"] / 1000)
+    elapsed_ms = int((time.time() - start) * 1000)
     if thread.is_alive():
-        metrics.record_enum("tool_call", name or "")
-        metrics.record_time(name or "tool", int((time.time() - start) * 1000))
+        metrics.record_tool_call(name or "", "timeout", elapsed_ms)
         return {"kind": "error", "code": "timeout", "error": "timeout"}
     if err is not None:
         code, msg = err
-        metrics.record_enum("tool_call", name or "")
-        metrics.record_time(name or "tool", int((time.time() - start) * 1000))
+        metrics.record_tool_call(name or "", "error", elapsed_ms)
         return {"kind": "error", "code": code, "error": msg}
 
     calls.append(now)
-    metrics.record_enum("tool_call", name or "")
-    metrics.record_time(name or "tool", int((time.time() - start) * 1000))
+    metrics.record_tool_call(name or "", "ok", elapsed_ms)
     return {"kind": "ok", "result": result}
