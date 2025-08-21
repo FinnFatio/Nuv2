@@ -15,9 +15,9 @@ def test_inspect_point_tesseract_error(monkeypatch, capsys):
         return ({}, {"bounds": {}}, "", 0.0)
 
     def fake_capture_around(pos, bounds=None):
-        return (Image.new("RGB", (1, 1)), None)
+        return (Image.new("RGB", (1, 1)), (0, 0, 0, 0))
 
-    def raise_ocr(img):
+    def raise_ocr(img, region=None):
         raise RuntimeError("tesseract_failed")
 
     monkeypatch.setattr(resolve, "get_position", fake_get_position)

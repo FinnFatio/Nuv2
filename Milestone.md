@@ -55,7 +55,7 @@ Os milestones M0–M3 representam a fundação: um **visor confiável**, enrique
   **DoD:** JSON inclui `automation_id`, `name`, `value` (quando houver), `control_type`, `is_enabled`, `is_offscreen`, `patterns[]`, `window:{handle, active}`.
   **Prioridade:** P0 • **Size:** M
 
-- [ ] **Etapa 2: OCR com recorte pelo elemento + heurística de fusão**
+- [X] **Etapa 2: OCR com recorte pelo elemento + heurística de fusão**
   Arquivos: `resolve.py`, `ocr.py`, `screenshot.py`
   **DoD:** se há `bounds` do elemento, OCR recorta dentro; heurística usa `is_offscreen`, `control_type`, `value/name` para definir `text.chosen` e `text.source∈{uia,ocr}`; threshold em `settings.py`.
   **Prioridade:** P1 • **Size:** M

@@ -32,9 +32,8 @@ def fake_describe_under_cursor(x=None, y=None):
             "affordances": {},
             "ancestors": [],
         },
-        "text": {"uia": "", "ocr": "", "chosen": ""},
+        "text": {"uia": "", "ocr": "", "chosen": "", "source": "ocr"},
         "confidence": {"uia": 0.0, "ocr": 0.0},
-        "source": "ocr",
         "window_id": "w1",
         "control_id": "c1",
         "timings": {},
@@ -263,9 +262,9 @@ def test_inspect_tesseract_error(monkeypatch):
         return ({}, {"bounds": {}}, "", 0.0)
 
     def fake_capture_around(pos, bounds=None):
-        return ("img", None)
+        return ("img", (0, 0, 0, 0))
 
-    def raise_ocr(img):  # pragma: no cover - error path
+    def raise_ocr(img, region=None):  # pragma: no cover - error path
         raise RuntimeError("tesseract_failed")
 
     monkeypatch.setattr(api.resolve, "get_position", fake_get_position)
