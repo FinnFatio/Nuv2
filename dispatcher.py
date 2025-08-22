@@ -7,7 +7,8 @@ from typing import Any, Dict
 import metrics
 from registry import get_tool
 
-_RATE_LIMITS: Dict[str, list[float]] = {}
+# token bucket: name -> {"tokens": float, "last": float}
+_RATE_LIMITS: Dict[str, Dict[str, float]] = {}
 
 Envelope = Dict[str, Any]
 
@@ -32,13 +33,24 @@ def dispatch(
         return {"kind": "error", "code": "forbidden", "error": "disabled in safe mode"}
 
     now = time.time()
-    calls = _RATE_LIMITS.setdefault(name, [])
-    calls[:] = [t for t in calls if now - t < 60]
-    if tool["rate_limit_per_min"] and len(calls) >= tool["rate_limit_per_min"]:
-        metrics.record_tool_call(
-            name or "", "rate_limit", int((time.time() - start) * 1000)
+    rate = tool["rate_limit_per_min"]
+    if rate:
+        bucket = _RATE_LIMITS.setdefault(
+            name, {"tokens": float(rate), "last": now}
         )
-        return {"kind": "error", "code": "rate_limit", "error": "rate limit exceeded"}
+        elapsed = now - bucket["last"]
+        bucket["tokens"] = min(float(rate), bucket["tokens"] + elapsed * (rate / 60.0))
+        bucket["last"] = now
+        if bucket["tokens"] < 1.0:
+            metrics.record_tool_call(
+                name or "", "rate_limit", int((time.time() - start) * 1000)
+            )
+            return {
+                "kind": "error",
+                "code": "rate_limit",
+                "error": "rate limit exceeded",
+            }
+        bucket["tokens"] -= 1.0
 
     result: Any | None = None
     err: tuple[str, str] | None = None
@@ -67,6 +79,5 @@ def dispatch(
         metrics.record_tool_call(name or "", "error", elapsed_ms)
         return {"kind": "error", "code": code, "error": msg}
 
-    calls.append(now)
     metrics.record_tool_call(name or "", "ok", elapsed_ms)
     return {"kind": "ok", "result": result}
