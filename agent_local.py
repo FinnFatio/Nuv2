@@ -193,30 +193,55 @@ class Agent:
         turn = 0
         failure_streak = 0
 
+        last_tool = ""
         while tool_calls_used < self.max_tools:
             turn += 1
             start_call = self.clock()
-            reply = self.llm(messages, max_tokens=256, temperature=0.2)
+            res = self.llm(messages, max_tokens=256, temperature=0.2)
+            if isinstance(res, tuple):
+                reply, usage = res
+            else:
+                reply, usage = res, None
             elapsed = self.clock() - start_call
-            tokens = len(reply.split())
-            tps = tokens / elapsed if elapsed > 0 else float("inf")
-            metrics.record_gauge("tokens_per_sec", tps)
-            self.log.info(
-                json.dumps(
-                    {
-                        "event": "llm_call",
-                        "elapsed_ms": int(elapsed * 1000),
-                        "tokens": tokens,
-                        "tokens_per_sec": tps,
-                        "conversation_id": conversation_id,
-                        "turn": turn,
-                        "safe_mode": self.safe_mode,
-                    }
+            if usage and isinstance(usage.get("completion_tokens"), int):
+                tokens = usage.get("completion_tokens", 0)
+                tps = tokens / elapsed if elapsed > 0 else float("inf")
+                metrics.record_gauge("tokens_per_sec", tps)
+                self.log.info(
+                    json.dumps(
+                        {
+                            "event": "llm_call",
+                            "elapsed_ms": int(elapsed * 1000),
+                            "tokens": tokens,
+                            "prompt_tokens": usage.get("prompt_tokens"),
+                            "tokens_per_sec": tps,
+                            "conversation_id": conversation_id,
+                            "turn": turn,
+                            "safe_mode": self.safe_mode,
+                        }
+                    )
                 )
-            )
+            else:
+                approx_tokens = len(reply.split())
+                tps = approx_tokens / elapsed if elapsed > 0 else float("inf")
+                metrics.record_gauge("tokens_per_sec", tps)
+                self.log.info(
+                    json.dumps(
+                        {
+                            "event": "llm_call",
+                            "elapsed_ms": int(elapsed * 1000),
+                            "approx_tokens": approx_tokens,
+                            "approx_tokens_per_sec": tps,
+                            "conversation_id": conversation_id,
+                            "turn": turn,
+                            "safe_mode": self.safe_mode,
+                        }
+                    )
+                )
             text, toolcalls = _parse_toolcalls(reply)
             messages.append({"role": "assistant", "content": text})
             if not toolcalls:
+                failure_streak = 0
                 return text.strip()
             for tc in toolcalls:
                 if tool_calls_used >= self.max_tools:
@@ -235,10 +260,13 @@ class Agent:
                     )
                     break
                 name = tc.get("name", "")
+                if name != last_tool:
+                    failure_streak = 0
+                    last_tool = name
                 tool = get_tool(name)
                 tool_call_id = tc.get("id") or str(uuid.uuid4())
                 request_id = str(uuid.uuid4())
-                if not tool:
+                if tool is None:
                     failure_streak += 1
                     self.log.warning(
                         json.dumps(
@@ -274,6 +302,29 @@ class Agent:
                         )
                         return "tool failures exceeded"
                     continue
+                if self.safe_mode and not tool.get("enabled_in_safe_mode", False):
+                    self.log.warning(
+                        json.dumps(
+                            {
+                                "event": "tool_disabled_safe_mode",
+                                "name": name,
+                                "conversation_id": conversation_id,
+                                "turn": turn,
+                                "request_id": request_id,
+                                "tool_call_id": tool_call_id,
+                                "safe_mode": self.safe_mode,
+                            }
+                        )
+                    )
+                    messages.append(
+                        {
+                            "role": "tool",
+                            "name": name,
+                            "tool_call_id": tool_call_id,
+                            "content": f"tool {name} disabled in safe_mode",
+                        }
+                    )
+                    continue
                 args = tc.get("args", {})
                 schema = tool.get("schema") if isinstance(tool, dict) else None
                 if schema:
@@ -300,6 +351,55 @@ class Agent:
                                 "name": name,
                                 "tool_call_id": tool_call_id,
                                 "content": "missing args: " + ", ".join(missing),
+                            }
+                        )
+                        if failure_streak >= 3:
+                            self.log.warning(
+                                json.dumps(
+                                    {
+                                        "event": "circuit_breaker",
+                                        "conversation_id": conversation_id,
+                                        "turn": turn,
+                                        "safe_mode": self.safe_mode,
+                                    }
+                                )
+                            )
+                            return "tool failures exceeded"
+                        continue
+                    props = schema.get("properties", {})
+                    invalid: List[str] = []
+                    for key, spec in props.items():
+                        if key in args and isinstance(spec, dict) and "type" in spec:
+                            expected = spec["type"]
+                            val = args[key]
+                            if expected == "string" and not isinstance(val, str):
+                                invalid.append(key)
+                            elif expected == "integer" and not isinstance(val, int):
+                                invalid.append(key)
+                            elif expected == "object" and not isinstance(val, dict):
+                                invalid.append(key)
+                    if invalid:
+                        failure_streak += 1
+                        self.log.warning(
+                            json.dumps(
+                                {
+                                    "event": "invalid_tool_args",
+                                    "name": name,
+                                    "invalid_type": invalid,
+                                    "conversation_id": conversation_id,
+                                    "turn": turn,
+                                    "request_id": request_id,
+                                    "tool_call_id": tool_call_id,
+                                    "safe_mode": self.safe_mode,
+                                }
+                            )
+                        )
+                        messages.append(
+                            {
+                                "role": "tool",
+                                "name": name,
+                                "tool_call_id": tool_call_id,
+                                "content": "invalid type for: " + ", ".join(invalid),
                             }
                         )
                         if failure_streak >= 3:
@@ -365,25 +465,49 @@ class Agent:
 
         turn += 1
         start_call = self.clock()
-        final = self.llm(_shrink(messages))
+        res = self.llm(_shrink(messages))
+        if isinstance(res, tuple):
+            final, usage = res
+        else:
+            final, usage = res, None
         elapsed = self.clock() - start_call
-        tokens = len(final.split())
-        tps = tokens / elapsed if elapsed > 0 else float("inf")
-        metrics.record_gauge("tokens_per_sec", tps)
-        self.log.info(
-            json.dumps(
-                {
-                    "event": "llm_call",
-                    "elapsed_ms": int(elapsed * 1000),
-                    "tokens": tokens,
-                    "tokens_per_sec": tps,
-                    "conversation_id": conversation_id,
-                    "turn": turn,
-                    "safe_mode": self.safe_mode,
-                    "final": True,
-                }
+        if usage and isinstance(usage.get("completion_tokens"), int):
+            tokens = usage.get("completion_tokens", 0)
+            tps = tokens / elapsed if elapsed > 0 else float("inf")
+            metrics.record_gauge("tokens_per_sec", tps)
+            self.log.info(
+                json.dumps(
+                    {
+                        "event": "llm_call",
+                        "elapsed_ms": int(elapsed * 1000),
+                        "tokens": tokens,
+                        "prompt_tokens": usage.get("prompt_tokens"),
+                        "tokens_per_sec": tps,
+                        "conversation_id": conversation_id,
+                        "turn": turn,
+                        "safe_mode": self.safe_mode,
+                        "final": True,
+                    }
+                )
             )
-        )
+        else:
+            approx_tokens = len(final.split())
+            tps = approx_tokens / elapsed if elapsed > 0 else float("inf")
+            metrics.record_gauge("tokens_per_sec", tps)
+            self.log.info(
+                json.dumps(
+                    {
+                        "event": "llm_call",
+                        "elapsed_ms": int(elapsed * 1000),
+                        "approx_tokens": approx_tokens,
+                        "approx_tokens_per_sec": tps,
+                        "conversation_id": conversation_id,
+                        "turn": turn,
+                        "safe_mode": self.safe_mode,
+                        "final": True,
+                    }
+                )
+            )
         text, _ = _parse_toolcalls(final)
         return text.strip()
 

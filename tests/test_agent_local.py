@@ -110,7 +110,7 @@ def test_agent_invalid_args(monkeypatch):
     monkeypatch.setattr(
         agent_local,
         "get_tool",
-        lambda name: {"name": name, "schema": {"required": ["msg"]}},
+        lambda name: {"name": name, "enabled_in_safe_mode": True, "schema": {"required": ["msg"]}},
     )
 
     agent = Agent(llm=llm)
@@ -125,7 +125,9 @@ def test_toolcall_log_includes_context(monkeypatch, capsys):
         return "done"
 
     monkeypatch.setattr(agent_local, "dispatch", lambda req, request_id, safe_mode: {"kind": "ok"})
-    monkeypatch.setattr(agent_local, "get_tool", lambda name: {"name": name})
+    monkeypatch.setattr(
+        agent_local, "get_tool", lambda name: {"name": name, "enabled_in_safe_mode": True}
+    )
     logger.setup(enable=True, jsonl=True)
     agent = Agent(llm=llm)
     agent.chat("hi")
@@ -159,7 +161,9 @@ def test_agent_respects_tool_limit(monkeypatch):
         return {"kind": "ok", "result": "ok"}
 
     monkeypatch.setattr(agent_local, "dispatch", fake_dispatch)
-    monkeypatch.setattr(agent_local, "get_tool", lambda name: {"name": name})
+    monkeypatch.setattr(
+        agent_local, "get_tool", lambda name: {"name": name, "enabled_in_safe_mode": True}
+    )
 
     agent = Agent(llm=llm, max_tools=3)
     assert agent.chat("hi") == "done"
@@ -192,8 +196,8 @@ def test_llm_tokens_per_second_logged(monkeypatch):
     agent = Agent(llm=llm, log=log, clock=clock)
     assert agent.chat("hi") == "a b c"
     entry = next(l for l in log.logs if l.get("event") == "llm_call" and not l.get("final"))
-    assert entry["tokens"] == 3
-    assert entry["tokens_per_sec"] == 3
+    assert entry["approx_tokens"] == 3
+    assert entry["approx_tokens_per_sec"] == 3
 
 
 def test_circuit_breaker_on_failures(monkeypatch):
@@ -213,7 +217,9 @@ def test_circuit_breaker_on_failures(monkeypatch):
             self.logs.append(json.loads(msg))
 
     log = DummyLogger()
-    monkeypatch.setattr(agent_local, "get_tool", lambda name: {"name": name})
+    monkeypatch.setattr(
+        agent_local, "get_tool", lambda name: {"name": name, "enabled_in_safe_mode": True}
+    )
     monkeypatch.setattr(agent_local, "dispatch", lambda req, request_id, safe_mode: {"kind": "error"})
     agent = Agent(llm=LLM(), log=log)
     assert agent.chat("hi") == "tool failures exceeded"
