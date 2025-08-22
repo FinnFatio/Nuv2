@@ -16,6 +16,7 @@ def register_tool(
     rate_limit_per_min: int,
     enabled_in_safe_mode: bool,
     func: Callable[..., Any],
+    schema: Dict[str, Any] | None = None,
 ) -> None:
     REGISTRY[name] = {
         "name": name,
@@ -27,6 +28,8 @@ def register_tool(
         "enabled_in_safe_mode": enabled_in_safe_mode,
         "func": func,
     }
+    if schema is not None:
+        REGISTRY[name]["schema"] = schema
 
 
 def get_tool(name: str) -> Dict[str, Any] | None:
