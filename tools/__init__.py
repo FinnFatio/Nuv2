@@ -38,6 +38,16 @@ def register_all_tools() -> None:
         func=system.uia_query,
     )
     register_tool(
+        name="system.info",
+        version="1",
+        summary="basic system info",
+        safety="read",
+        timeout_ms=1000,
+        rate_limit_per_min=60,
+        enabled_in_safe_mode=True,
+        func=system.info,
+    )
+    register_tool(
         name="fs.list",
         version="1",
         summary="list directory",

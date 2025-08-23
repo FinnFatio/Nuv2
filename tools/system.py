@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import base64
 import io
-from typing import Any, Dict, Tuple
+import platform
+from typing import Any, Dict, Tuple, cast
 
+import psutil
+from settings import SAFE_MODE
 from ocr import extract_text
 from screenshot import capture
 from resolve import describe_under_cursor
@@ -23,7 +26,7 @@ def _resolve_bounds(
         )
     if window_id or control_id:
         try:
-            from api import BOUNDS_CACHE  # type: ignore
+            from api import BOUNDS_CACHE
         except Exception:  # pragma: no cover - missing API context
             return None
         b = None
@@ -70,4 +73,43 @@ def ocr(
 def uia_query(x: int, y: int) -> Dict[str, Any]:
     """Query UIA/resolve for coordinates."""
 
-    return describe_under_cursor(x, y)
+    return cast(Dict[str, Any], describe_under_cursor(x, y))
+
+
+def info() -> Dict[str, Any]:
+    """Return basic system information without network identifiers."""
+
+    data: Dict[str, Any] = {
+        "os": {
+            "name": platform.system(),
+            "version": platform.release(),
+        },
+        "cpu": {"count": psutil.cpu_count(logical=True)},
+        "ram_bytes": psutil.virtual_memory().total,
+        "gpus": [],
+        "monitors": [],
+        "safe_mode": SAFE_MODE,
+    }
+
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            data["gpus"] = [
+                torch.cuda.get_device_name(i) for i in range(torch.cuda.device_count())
+            ]
+    except Exception:
+        pass
+
+    try:
+        import mss as mss_lib
+
+        with mss_lib.mss() as sct:  # type: ignore[attr-defined]
+            for mon in sct.monitors[1:]:  # first entry is virtual monitor
+                data["monitors"].append(
+                    {"width": int(mon["width"]), "height": int(mon["height"])}
+                )
+    except Exception:
+        pass
+
+    return data

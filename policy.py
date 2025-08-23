@@ -42,5 +42,22 @@ class Policy:
             k in text for k in ["price", "preço", "news", "notícia", "weather", "meteo"]
         ):
             tools.append("web.read")
+        if any(
+            k in text
+            for k in [
+                "system info",
+                "system information",
+                "info do sistema",
+                "informações do sistema",
+                "cpu",
+                "ram",
+                "gpu",
+                "memória",
+                "monitor",
+                "monitores",
+                "safe mode",
+            ]
+        ):
+            tools.append("system.info")
 
         return tools[:3]

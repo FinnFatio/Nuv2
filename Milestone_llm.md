@@ -43,7 +43,7 @@ Os milestones LLM-0…LLM-3 representam a evolução de um **agente local** → 
   - envelope de erro padronizado
   **Prioridade:** P0 • **Size:** S
 
-- [ ] **Etapa 2: Policy *explain‑first* (gates)**  
+- [x] **Etapa 2: Policy *explain‑first* (gates)**
   Arquivos: `policy.py`  
   **DoD:**  
   - Perguntas **conceituais/estáveis** → **sem tool**.  
