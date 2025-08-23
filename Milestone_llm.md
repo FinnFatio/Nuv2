@@ -58,7 +58,7 @@ Os milestones LLM-0…LLM-3 representam a evolução de um **agente local** → 
   **DoD:** registrar `agent_turn_ms`, `agent_tool_uses_total`, `agent_policy_blocks_total{reason}`; logar por chamada `tool_name`, `latency_ms`, `outcome`.  
   **Prioridade:** P1 • **Size:** S
 
-- [ ] **Etapa 4: Testes E2E mínimos (sem rede real)**  
+- [x] **Etapa 4: Testes E2E mínimos (sem rede real)**
   Arquivos: `tests/test_agent_local.py`  
   **DoD:**  
   - “O que é entropia?” → resposta **sem** tool.  

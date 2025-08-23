@@ -615,3 +615,97 @@ def test_dry_run_skips_dispatch(monkeypatch):
     agent.dry_run = True
     assert agent.chat("hi") == "done"
     assert called is False
+
+
+def test_e2e_conceptual_without_tool(monkeypatch):
+    called = False
+
+    def fake_dispatch(req, request_id, safe_mode):
+        nonlocal called
+        called = True
+        return {"kind": "ok"}
+
+    monkeypatch.setattr(agent_local, "dispatch", fake_dispatch)
+
+    def llm(messages, **kwargs):
+        return "Entropia é uma medida de desordem."
+
+    agent = Agent(llm=llm)
+    out = agent.chat("O que é entropia?")
+    assert "desordem" in out.lower()
+    assert called is False
+
+
+def test_e2e_recent_web_read(monkeypatch):
+    calls: List[Dict[str, Any]] = []
+
+    def fake_dispatch(req, request_id, safe_mode):
+        calls.append(req)
+        return {
+            "kind": "ok",
+            "result": {
+                "text": "R$5,00",
+                "source": "Banco Central",
+                "date": "2024-07-01",
+            },
+        }
+
+    monkeypatch.setattr(agent_local, "dispatch", fake_dispatch)
+    monkeypatch.setattr(
+        agent_local, "get_tool", lambda name: {"name": name, "enabled_in_safe_mode": True}
+    )
+
+    class LLM:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def __call__(self, messages, **kwargs):
+            self.calls += 1
+            if self.calls == 1:
+                return '<toolcall>{"name":"web.read","id":"1"}</toolcall>'
+            assert messages[-2]["role"] == "tool"
+            return "Cotação do dólar: R$5,00 (Banco Central, 2024-07-01)."
+
+    agent = Agent(llm=LLM())
+    out = agent.chat("dólar hoje?")
+    assert "Banco Central" in out
+    assert "2024-07-01" in out
+    assert len(calls) == 1
+    assert calls[0]["name"] == "web.read"
+
+
+def test_e2e_tool_blocked_by_policy(monkeypatch):
+    called = False
+
+    def fake_dispatch(req, request_id, safe_mode):
+        nonlocal called
+        called = True
+        return {"kind": "ok"}
+
+    monkeypatch.setattr(agent_local, "dispatch", fake_dispatch)
+    monkeypatch.setattr(
+        agent_local,
+        "get_tool",
+        lambda name: {
+            "name": name,
+            "enabled_in_safe_mode": True,
+            "safety": "destructive",
+        },
+    )
+
+    class LLM:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def __call__(self, messages, **kwargs):
+            self.calls += 1
+            if self.calls == 1:
+                return '<toolcall>{"name":"boom"}</toolcall>'
+            assert messages[-2]["role"] == "tool"
+            content = json.loads(messages[-2]["content"])
+            assert content["code"] == "forbidden_in_safe_mode"
+            return "done"
+
+    agent = Agent(llm=LLM())
+    assert agent.chat("delete arquivo") == "done"
+    assert called is False
