@@ -4,8 +4,10 @@ import base64
 import time
 import zipfile
 
+import metrics
+
 from dispatcher import dispatch
-from registry import clear, register_tool
+from registry import clear, register_tool, register_alias
 import tools
 
 
@@ -102,7 +104,49 @@ def test_dispatcher_errors(tmp_path):
         func=lambda: time.sleep(0.05),
     )
     env = dispatch({"name": "slow", "args": {}}, request_id="9")
-    assert env["code"] == "timeout"
+    assert env["code"] == "timeout" and "elapsed_ms" in env
 
     env = dispatch({"name": "fs.read", "args": {}}, request_id="10")
     assert env["code"] == "bad_args"
+
+
+def test_rate_limit_records_metric():
+    clear()
+    metrics.reset()
+    register_tool(
+        name="limited_metric",
+        version="1",
+        summary="",
+        safety="ro",
+        timeout_ms=1000,
+        rate_limit_per_min=1,
+        enabled_in_safe_mode=True,
+        func=lambda: "ok",
+    )
+    dispatch({"name": "limited_metric", "args": {}}, request_id="1")
+    dispatch({"name": "limited_metric", "args": {}}, request_id="2")
+    data = metrics.summary()
+    assert data["status_total"]["limited_metric"]["rate_limited"] == 1
+
+
+def test_registry_alias_dispatch():
+    clear()
+    called = []
+
+    def fn():
+        called.append(True)
+        return "ok"
+
+    register_tool(
+        name="orig",
+        version="1",
+        summary="",
+        safety="ro",
+        timeout_ms=1000,
+        rate_limit_per_min=10,
+        enabled_in_safe_mode=True,
+        func=fn,
+    )
+    register_alias("orig", "alias")
+    env = dispatch({"name": "alias", "args": {}}, request_id="1")
+    assert env["kind"] == "ok" and called

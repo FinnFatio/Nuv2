@@ -30,8 +30,17 @@ Os milestones LLM-0…LLM-3 representam a evolução de um **agente local** → 
 **Objetivo:** rodar a LLM **localmente**, decidir quando usar ferramentas e executar até **3** chamadas por turno via `dispatch()` **em processo** (sem HTTP).
 
 - [x] **Etapa 1: Loop do agente + parser de toolcall**
-  Arquivos: `agent_local.py`  
-  **DoD:** suporte a `<toolcall>{ "name": "...", "args": {...} }</toolcall>`, no máx. **3** chamadas por turno; truncar payloads grandes antes de devolver ao modelo; parametrizar backend por **`LLM_ENDPOINT`** e **`LLM_MODEL`**.  
+  Arquivos: `agent_local.py`
+  **DoD:**
+  - suporte a `<toolcall>{ "name": "...", "args": {...} }</toolcall>`
+  - no máx. **3** chamadas por turno
+  - truncar payloads grandes antes de devolver ao modelo
+  - parametrizar backend por **`LLM_ENDPOINT`** e **`LLM_MODEL`**
+  - reduzir contexto via `_shrink()`
+  - redigir PII antes de truncar (`_redact`)
+  - cap por reply respeitando quota restante
+  - headers opcionais para LLM
+  - envelope de erro padronizado
   **Prioridade:** P0 • **Size:** S
 
 - [ ] **Etapa 2: Policy *explain‑first* (gates)**  

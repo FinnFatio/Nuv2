@@ -45,6 +45,7 @@ def dispatch(
             metrics.record_tool_call(
                 name or "", "rate_limit", int((time.time() - start) * 1000)
             )
+            metrics.record_route_status(name or "", "rate_limited")
             return {
                 "kind": "error",
                 "code": "rate_limit",
@@ -73,9 +74,10 @@ def dispatch(
     elapsed_ms = int((time.time() - start) * 1000)
     if thread.is_alive():
         metrics.record_tool_call(name or "", "timeout", elapsed_ms)
-        return {"kind": "error", "code": "timeout", "error": "timeout"}
+        return {"kind": "error", "code": "timeout", "elapsed_ms": elapsed_ms}
     if err is not None:
         code, msg = err
+        code = code or "internal"
         metrics.record_tool_call(name or "", "error", elapsed_ms)
         return {"kind": "error", "code": code, "error": msg}
 

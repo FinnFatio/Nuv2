@@ -36,9 +36,23 @@ def get_tool(name: str) -> Dict[str, Any] | None:
     return REGISTRY.get(name)
 
 
+def register_alias(name: str, alias: str) -> None:
+    if name in REGISTRY:
+        REGISTRY[alias] = REGISTRY[name]
+
+
 def clear() -> None:
     REGISTRY.clear()
 
 
 def violates_policy(tool: Dict[str, Any], safe_mode: bool) -> bool:
     return safe_mode and tool.get("safety") == "destructive"
+
+
+__all__ = [
+    "register_tool",
+    "get_tool",
+    "register_alias",
+    "clear",
+    "violates_policy",
+]

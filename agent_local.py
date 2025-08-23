@@ -7,6 +7,7 @@ import uuid
 import time
 import random
 import logging
+import hashlib
 from typing import Any, Dict, List, Tuple, TypedDict, Protocol, Callable
 
 import requests
@@ -203,12 +204,17 @@ class Agent:
         model: str | None = None,
         log: logging.Logger | None = None,
         clock: Callable[[], float] | None = None,
+        temperature: float = 0.2,
+        max_tokens: int = 256,
     ) -> None:
         self.llm: LLMFn = llm or _default_llm_backend(endpoint=endpoint, model=model)
         self.max_tools = max_tools
         self.safe_mode = settings.SAFE_MODE if safe_mode is None else safe_mode
         self.log = log or _logger.get_logger()
         self.clock = clock or time.time
+        self.temperature = temperature
+        self.max_tokens = max_tokens
+        self.model = model or os.getenv("LLM_MODEL", "")
 
     def chat(self, prompt: str) -> str:
         messages: Messages = [{"role": "user", "content": prompt}]
@@ -221,8 +227,14 @@ class Agent:
         while tool_calls_used < self.max_tools:
             turn += 1
             messages = _shrink(messages, max_msgs=20)
+            remaining = self.max_tools - tool_calls_used
+            messages.append({"role": "system", "content": f"[remaining_tools={remaining}]"})
             start_call = self.clock()
-            res = self.llm(messages, max_tokens=256, temperature=0.2)
+            res = self.llm(
+                messages,
+                max_tokens=self.max_tokens,
+                temperature=self.temperature,
+            )
             if isinstance(res, tuple):
                 reply, usage = res
             else:
@@ -231,7 +243,7 @@ class Agent:
             if usage and isinstance(usage.get("completion_tokens"), int):
                 tokens = usage.get("completion_tokens", 0)
                 tps = tokens / elapsed if elapsed > 0 else float("inf")
-                metrics.record_gauge("tokens_per_sec", tps)
+                metrics.record_gauge("tokens_per_sec", tps, label=self.model)
                 self.log.info(
                     json.dumps(
                         {
@@ -249,7 +261,7 @@ class Agent:
             else:
                 approx_tokens = len(reply.split())
                 tps = approx_tokens / elapsed if elapsed > 0 else float("inf")
-                metrics.record_gauge("tokens_per_sec", tps)
+                metrics.record_gauge("tokens_per_sec", tps, label=self.model)
                 self.log.info(
                     json.dumps(
                         {
@@ -351,7 +363,11 @@ class Agent:
                             "name": name,
                             "tool_call_id": tool_call_id,
                             "content": json.dumps(
-                                {"kind": "error", "code": "forbidden_in_safe_mode"}
+                                {
+                                    "kind": "error",
+                                    "code": "forbidden_in_safe_mode",
+                                    "hint": "peça confirmação ou proponha alternativa",
+                                }
                             ),
                         }
                     )
@@ -503,6 +519,23 @@ class Agent:
                                 "Posso tentar outro caminho (sem tools) ou você quer ajustar o pedido?"
                             )
                         continue
+                if getattr(self, "dry_run", False):
+                    messages.append(
+                        {
+                            "role": "tool",
+                            "name": name,
+                            "tool_call_id": tool_call_id,
+                            "content": json.dumps(
+                                {
+                                    "kind": "ok",
+                                    "dry_run": True,
+                                    "args": args,
+                                }
+                            ),
+                        }
+                    )
+                    tool_calls_used += 1
+                    continue
                 retry = int((schema or {}).get("x-retry", 0))
                 attempts = 1 + max(0, retry)
                 envelope: Dict[str, Any] = {}
@@ -511,7 +544,25 @@ class Agent:
                     start = self.clock()
                     envelope = dispatch(tc, request_id=request_id, safe_mode=self.safe_mode)
                     raw = json.dumps(envelope, ensure_ascii=False)
+                    raw_hash = hashlib.sha256(
+                        raw.encode("utf-8", "ignore")
+                    ).hexdigest()[:12]
+                    self.log.info(
+                        json.dumps(
+                            {
+                                "event": "tool_result",
+                                "name": name,
+                                "hash": raw_hash,
+                                "size": len(raw),
+                            }
+                        )
+                    )
                     payload = _truncate(_redact(raw))
+                    payload = re.sub(r"\s{3,}", "  ", payload)
+                    short = payload[: settings.MAX_LOG_CHARS]
+                    self.log.info(
+                        json.dumps({"event": "tool_result", "preview": short})
+                    )
                     elapsed_ms = int((self.clock() - start) * 1000)
                     self.log.info(
                         json.dumps(
@@ -569,7 +620,11 @@ class Agent:
         turn += 1
         messages = _shrink(messages, max_msgs=20)
         start_call = self.clock()
-        res = self.llm(messages)
+        res = self.llm(
+            messages,
+            max_tokens=self.max_tokens,
+            temperature=self.temperature,
+        )
         if isinstance(res, tuple):
             final, usage = res
         else:
@@ -578,7 +633,7 @@ class Agent:
         if usage and isinstance(usage.get("completion_tokens"), int):
             tokens = usage.get("completion_tokens", 0)
             tps = tokens / elapsed if elapsed > 0 else float("inf")
-            metrics.record_gauge("tokens_per_sec", tps)
+            metrics.record_gauge("tokens_per_sec", tps, label=self.model)
             self.log.info(
                 json.dumps(
                     {
@@ -597,7 +652,7 @@ class Agent:
         else:
             approx_tokens = len(final.split())
             tps = approx_tokens / elapsed if elapsed > 0 else float("inf")
-            metrics.record_gauge("tokens_per_sec", tps)
+            metrics.record_gauge("tokens_per_sec", tps, label=self.model)
             self.log.info(
                 json.dumps(
                     {
