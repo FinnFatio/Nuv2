@@ -70,3 +70,17 @@ def test_capture_log_dest_fallback(monkeypatch, capsys):
     assert "CAPTURE_LOG_DEST" in err
     assert "not writable" in err
     assert settings.CAPTURE_LOG_DEST == "stderr"
+
+
+def test_max_log_chars_default():
+    import importlib
+
+    importlib.reload(settings)
+    assert settings.MAX_LOG_CHARS == 2000
+
+
+def test_safe_mode_default_policy():
+    import importlib
+
+    importlib.reload(settings)
+    assert settings.SAFE_MODE_DEFAULT_POLICY == "block_destructive"

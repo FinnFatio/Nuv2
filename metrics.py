@@ -14,9 +14,9 @@ _times: Dict[str, Deque[int]] = {
 _fallbacks: Counter[str] = Counter()
 _route_total: Counter[str] = Counter()
 _route_errors: Counter[str] = Counter()
-_route_status: Counter[Tuple[str, int]] = Counter()
+_route_status: Counter[Tuple[str, str]] = Counter()
 _rate_limited_total = 0
-_gauges: Dict[str, int | float] = {}
+_gauges: Dict[str, int | float | Dict[str, int | float]] = {}
 _enums: Dict[str, Counter[str]] = {}
 _policy_blocked: Counter[str] = Counter()
 _tool_calls: Counter[Tuple[str, str]] = Counter()
@@ -33,8 +33,15 @@ def record_fallback(name: str) -> None:
     _fallbacks[name] += 1
 
 
-def record_gauge(name: str, value: int | float) -> None:
-    _gauges[name] = value
+def record_gauge(name: str, value: int | float, *, label: str | None = None) -> None:
+    if label is None:
+        _gauges[name] = value
+    else:
+        bucket = _gauges.setdefault(name, {})
+        if isinstance(bucket, dict):
+            bucket[label] = value
+        else:  # pragma: no cover - defensive
+            _gauges[name] = {label: value}
 
 
 def record_enum(name: str, value: str) -> None:
@@ -55,9 +62,13 @@ def record_request(route: str, status: int) -> None:
     _route_total[route] += 1
     if status >= 400:
         _route_errors[route] += 1
-    _route_status[(route, status)] += 1
+    _route_status[(route, str(status))] += 1
     if status == 429:
         _rate_limited_total += 1
+
+
+def record_route_status(route: str, status: str) -> None:
+    _route_status[(route, status)] += 1
 
 
 def _percentile(dq: Deque[int], pct: float) -> int | None:
@@ -82,7 +93,7 @@ def summary() -> Dict:
         route: (_route_errors[route] / total if total else 0.0)
         for route, total in _route_total.items()
     }
-    status_total: Dict[str, Dict[int, int]] = {}
+    status_total: Dict[str, Dict[str, int]] = {}
     for (route, status), count in _route_status.items():
         status_total.setdefault(route, {})[status] = count
     tool_latency = {

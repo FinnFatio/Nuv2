@@ -109,49 +109,49 @@ text, _ = _parse_toolcalls(final)
 return re.sub(r"\s+\n", "\n", text.strip())
 ```
 
-[ ] 13. **agent_local.py** — Temperatura e max_tokens parametrizáveis  
+[x] 13. **agent_local.py** — Temperatura e max_tokens parametrizáveis
 ```python
 self.temperature = temperature
 self.max_tokens = max_tokens
 self.llm(messages, max_tokens=self.max_tokens, temperature=self.temperature)
 ```
 
-[ ] 14. **settings.py** — Acrescentar chaves para LLM headers  
+[x] 14. **settings.py** — Acrescentar chaves para LLM headers
 ```python
 DEFAULTS.update({"LLM_API_KEY":"", "LLM_AUTH_HEADER":""})
 LLM_API_KEY = CONFIG["LLM_API_KEY"]
 LLM_AUTH_HEADER = CONFIG["LLM_AUTH_HEADER"]
 ```
 
-[ ] 15. **dispatcher.py** — Código de erro interno padronizado  
+[x] 15. **dispatcher.py** — Código de erro interno padronizado
 ```python
 code, msg = err
 code = code or "internal"
 ```
 
-[ ] 16. **dispatcher.py** — Métrica de rate limit com motivo  
+[x] 16. **dispatcher.py** — Métrica de rate limit com motivo
 ```python
 metrics.record_route_status(name, "rate_limited")
 ```
 
-[ ] 17. **metrics.py** — Gauge de tokens_per_sec por LLM isolado  
+[x] 17. **metrics.py** — Gauge de tokens_per_sec por LLM isolado
 ```python
 record_gauge("tokens_per_sec", tps, label=model)
 ```
 
-[ ] 18. **tests/test_agent_local.py** — Casos extras do parser  
+[x] 18. **tests/test_agent_local.py** — Casos extras do parser
 - Vários `<toolcall>` intercalados com texto.  
 - JSON malformado (trailing commas, aspas simples).
 
-[ ] 19. **tests/test_agent_local.py** — Safe Mode bloqueando “destructive”  
+[x] 19. **tests/test_agent_local.py** — Safe Mode bloqueando “destructive”
 Simular tool com `safety="destructive"`, garantir erro padronizado.
 
-[ ] 20. **registry.py** — Alias/versão para tools (futuro)  
+[x] 20. **registry.py** — Alias/versão para tools (futuro)
 ```python
 REGISTRY[alias] = REGISTRY[name]
 ```
 
-[ ] 21. **agent_local.py** — Dry-run de toolcalls  
+[x] 21. **agent_local.py** — Dry-run de toolcalls
 ```python
 if getattr(self, "dry_run", False):
     messages.append({"role":"tool","name":name,"tool_call_id":tool_call_id,
@@ -159,52 +159,52 @@ if getattr(self, "dry_run", False):
     continue
 ```
 
-[ ] 22. **agent_local.py** — Mensagem curta ao modelo quando safe_mode bloqueia  
+[x] 22. **agent_local.py** — Mensagem curta ao modelo quando safe_mode bloqueia
 ```python
 messages.append({"role":"tool","name":name,"tool_call_id":tool_call_id,
                  "content":json.dumps({"kind":"error","code":"forbidden_in_safe_mode",
                                        "hint":"peça confirmação ou proponha alternativa"})})
 ```
 
-[ ] 23. **agent_local.py** — Hash de conteúdo pesado em logs  
+[x] 23. **agent_local.py** — Hash de conteúdo pesado em logs
 ```python
 raw_hash = hashlib.sha256(raw.encode("utf-8","ignore")).hexdigest()[:12]
 self.log.info(json.dumps({"event":"tool_result","name":name,"hash":raw_hash,"size":len(raw)}))
 payload = _truncate(_redact(raw))
 ```
 
-[ ] 24. **settings.py** — Limites separados para log e retorno ao modelo  
+[x] 24. **settings.py** — Limites separados para log e retorno ao modelo
 ```python
 DEFAULTS.update({"MAX_LOG_CHARS": 2000})
 MAX_LOG_CHARS = CONFIG["MAX_LOG_CHARS"]
 ```
 
-[ ] 25. **agent_local.py** — Aplicar MAX_LOG_CHARS nos logs  
+[x] 25. **agent_local.py** — Aplicar MAX_LOG_CHARS nos logs
 ```python
 short = payload[:settings.MAX_LOG_CHARS]
 self.log.info(json.dumps({"event":"tool_result","preview":short}))
 ```
 
-[ ] 26. **agent_local.py** — Telemetria de “remaining_tools”  
+[x] 26. **agent_local.py** — Telemetria de “remaining_tools”
 ```python
 messages.append({"role":"system","content":f"[remaining_tools={remaining}]"})
 ```
 
-[ ] 27. **settings.py** — SAFE_MODE_DEFAULT_POLICY (string)  
+[x] 27. **settings.py** — SAFE_MODE_DEFAULT_POLICY (string)
 ```python
 DEFAULTS.update({"SAFE_MODE_DEFAULT_POLICY":"block_destructive"})
 SAFE_MODE_DEFAULT_POLICY = CONFIG["SAFE_MODE_DEFAULT_POLICY"]
 ```
 
-[ ] 28. **dispatcher.py** — Return detail em timeout  
+[x] 28. **dispatcher.py** — Return detail em timeout
 ```python
 return {"kind":"error","code":"timeout","elapsed_ms":elapsed_ms}
 ```
 
-[ ] 29. **agent_local.py** — Normalizar whitespace de tool replies (extra)  
+[x] 29. **agent_local.py** — Normalizar whitespace de tool replies (extra)
 ```python
 content = re.sub(r"\s{3,}", "  ", content)
 ```
 
-[ ] 30. **milestone_llm.md** — Atualizar DoD da Etapa 1  
+[x] 30. **milestone_llm.md** — Atualizar DoD da Etapa 1
 Adicionar bullets: shrink, redact, cap por reply, headers LLM, erro padronizado.

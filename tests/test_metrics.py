@@ -26,6 +26,7 @@ def test_metrics_endpoint(monkeypatch):
     metrics.record_time("cursor", 30)
     metrics.record_fallback("used_ocr")
     metrics.record_gauge("text_len", 5)
+    metrics.record_gauge("tokens_per_sec", 7, label="gpt")
     metrics.record_enum("text_source", "ocr")
     metrics.record_request("/inspect", 200)
     metrics.record_request("/inspect", 429)
@@ -40,4 +41,5 @@ def test_metrics_endpoint(monkeypatch):
     assert data["status_total"]["/inspect"]["429"] == 1
     assert data["rate_limited_total"] == 1
     assert data["gauges"]["text_len"] == 5
+    assert data["gauges"]["tokens_per_sec"]["gpt"] == 7
     assert data["enums"]["text_source"]["ocr"] == 1
