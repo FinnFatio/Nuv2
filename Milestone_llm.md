@@ -53,7 +53,7 @@ Os milestones LLM-0…LLM-3 representam a evolução de um **agente local** → 
   - **Tool adicional para contexto do ambiente:** `system.info` (read‑only) retornando OS/CPU/RAM/GPU/monitores/`safe_mode` para orientar o planejamento sem expor IP.  
   **Prioridade:** P0 • **Size:** S
 
-- [ ] **Etapa 3: Telemetria do agente**  
+- [x] **Etapa 3: Telemetria do agente**
   Arquivos: `agent_local.py`, `metrics.py`  
   **DoD:** registrar `agent_turn_ms`, `agent_tool_uses_total`, `agent_policy_blocks_total{reason}`; logar por chamada `tool_name`, `latency_ms`, `outcome`.  
   **Prioridade:** P1 • **Size:** S

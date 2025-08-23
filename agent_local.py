@@ -23,7 +23,6 @@ MAX_TOOL_RESULT_CHARS = 1000
 MAX_TOOL_RESULT_TOKENS = 512
 
 
-
 class ToolCall(TypedDict, total=False):
     name: str
     args: Dict[str, Any]
@@ -47,14 +46,16 @@ class LLMFn(Protocol):
         *,
         max_tokens: int | None = None,
         temperature: float | None = None,
-    ) -> str:
-        ...
+    ) -> str: ...
+
 
 _TOOLCALL_RE = re.compile(r"<toolcall>(.*?)</toolcall>", re.DOTALL)
 
 _RE_EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 _RE_USERPATH = re.compile(r"C:\\Users\\[^\\]+", re.IGNORECASE)
-_RE_TOKEN = re.compile(r"(?:api[_-]?key|token|secret)\s*[:=]\s*([A-Za-z0-9._-]{8,})", re.IGNORECASE)
+_RE_TOKEN = re.compile(
+    r"(?:api[_-]?key|token|secret)\s*[:=]\s*([A-Za-z0-9._-]{8,})", re.IGNORECASE
+)
 
 
 def _redact(text: str) -> str:
@@ -74,7 +75,9 @@ def _truncate(
         removed = len(tokens) - token_limit
         text = " ".join(tokens[:token_limit]) + f"... [truncated {removed} tokens]"
     if len(text) > char_limit:
-        return text[:char_limit] + "..." + f" [truncated {len(text) - char_limit} chars]"
+        return (
+            text[:char_limit] + "..." + f" [truncated {len(text) - char_limit} chars]"
+        )
     return text
 
 
@@ -101,14 +104,22 @@ def _parse_toolcalls(content: str) -> Tuple[str, List[ToolCall]]:
                     name = str(func.get("name", ""))
                     args_raw = func.get("arguments", {})
                     try:
-                        args = json.loads(args_raw) if isinstance(args_raw, str) else args_raw
+                        args = (
+                            json.loads(args_raw)
+                            if isinstance(args_raw, str)
+                            else args_raw
+                        )
                     except Exception:
                         args = {}
-                    toolcalls.append({"name": name, "args": args, "id": item.get("id", "")})
+                    toolcalls.append(
+                        {"name": name, "args": args, "id": item.get("id", "")}
+                    )
                 else:
                     name = str(item.get("name", ""))
                     args = item.get("args", {})
-                    toolcalls.append({"name": name, "args": args, "id": item.get("id", "")})
+                    toolcalls.append(
+                        {"name": name, "args": args, "id": item.get("id", "")}
+                    )
             return str(data.get("content", "")).strip(), toolcalls
 
     def repl(match: re.Match[str]) -> str:
@@ -217,6 +228,7 @@ class Agent:
         self.model = model or os.getenv("LLM_MODEL", "")
 
     def chat(self, prompt: str) -> str:
+        start_turn = self.clock()
         messages: Messages = [{"role": "user", "content": prompt}]
         tool_calls_used = 0
         conversation_id = str(uuid.uuid4())
@@ -228,7 +240,9 @@ class Agent:
             turn += 1
             messages = _shrink(messages, max_msgs=20)
             remaining = self.max_tools - tool_calls_used
-            messages.append({"role": "system", "content": f"[remaining_tools={remaining}]"})
+            messages.append(
+                {"role": "system", "content": f"[remaining_tools={remaining}]"}
+            )
             start_call = self.clock()
             res = self.llm(
                 messages,
@@ -297,12 +311,16 @@ class Agent:
             messages.append({"role": "assistant", "content": text})
             if not toolcalls:
                 failure_streak = 0
+                elapsed_turn = int((self.clock() - start_turn) * 1000)
+                metrics.record_agent_turn(elapsed_turn)
                 return re.sub(r"\s+\n", "\n", text.strip())
             for tc in toolcalls:
                 raw = tc.get("name", "")
                 name = raw.strip().lower()
                 if not re.fullmatch(r"[a-z0-9._-]{1,64}", name):
-                    self.log.warning(json.dumps({"event": "tool_name_invalid", "raw": raw}))
+                    self.log.warning(
+                        json.dumps({"event": "tool_name_invalid", "raw": raw})
+                    )
                     continue
                 if name != last_tool:
                     failure_streak = 0
@@ -351,12 +369,15 @@ class Agent:
                                 }
                             )
                         )
+                        elapsed_turn = int((self.clock() - start_turn) * 1000)
+                        metrics.record_agent_turn(elapsed_turn)
                         return (
                             "Falhei repetidamente ao usar ferramentas nesta tarefa. "
                             "Posso tentar outro caminho (sem tools) ou você quer ajustar o pedido?"
                         )
                     continue
                 if violates_policy(tool, self.safe_mode):
+                    metrics.record_policy_block("destructive")
                     messages.append(
                         {
                             "role": "tool",
@@ -373,6 +394,7 @@ class Agent:
                     )
                     continue
                 if self.safe_mode and not tool.get("enabled_in_safe_mode", False):
+                    metrics.record_policy_block("safe_mode")
                     self.log.warning(
                         json.dumps(
                             {
@@ -448,6 +470,8 @@ class Agent:
                                     }
                                 )
                             )
+                            elapsed_turn = int((self.clock() - start_turn) * 1000)
+                            metrics.record_agent_turn(elapsed_turn)
                             return (
                                 "Falhei repetidamente ao usar ferramentas nesta tarefa. "
                                 "Posso tentar outro caminho (sem tools) ou você quer ajustar o pedido?"
@@ -514,6 +538,8 @@ class Agent:
                                     }
                                 )
                             )
+                            elapsed_turn = int((self.clock() - start_turn) * 1000)
+                            metrics.record_agent_turn(elapsed_turn)
                             return (
                                 "Falhei repetidamente ao usar ferramentas nesta tarefa. "
                                 "Posso tentar outro caminho (sem tools) ou você quer ajustar o pedido?"
@@ -542,7 +568,9 @@ class Agent:
                 payload = ""
                 for i in range(attempts):
                     start = self.clock()
-                    envelope = dispatch(tc, request_id=request_id, safe_mode=self.safe_mode)
+                    envelope = dispatch(
+                        tc, request_id=request_id, safe_mode=self.safe_mode
+                    )
                     raw = json.dumps(envelope, ensure_ascii=False)
                     raw_hash = hashlib.sha256(
                         raw.encode("utf-8", "ignore")
@@ -564,6 +592,10 @@ class Agent:
                         json.dumps({"event": "tool_result", "preview": short})
                     )
                     elapsed_ms = int((self.clock() - start) * 1000)
+                    outcome = envelope.get("kind", "error")
+                    if outcome == "error":
+                        outcome = envelope.get("code", "error")
+                    metrics.record_agent_tool_use(name, outcome, elapsed_ms)
                     self.log.info(
                         json.dumps(
                             {
@@ -579,6 +611,7 @@ class Agent:
                                 "safe_mode": self.safe_mode,
                                 "attempt": i + 1,
                                 "attempts": attempts,
+                                "outcome": outcome,
                             }
                         )
                     )
@@ -611,6 +644,8 @@ class Agent:
                             }
                         )
                     )
+                    elapsed_turn = int((self.clock() - start_turn) * 1000)
+                    metrics.record_agent_turn(elapsed_turn)
                     return (
                         "Falhei repetidamente ao usar ferramentas nesta tarefa. "
                         "Posso tentar outro caminho (sem tools) ou você quer ajustar o pedido?"
@@ -668,6 +703,8 @@ class Agent:
                 )
             )
         text, _ = _parse_toolcalls(final)
+        elapsed_turn = int((self.clock() - start_turn) * 1000)
+        metrics.record_agent_turn(elapsed_turn)
         return re.sub(r"\s+\n", "\n", text.strip())
 
 
