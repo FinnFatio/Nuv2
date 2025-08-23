@@ -2,7 +2,7 @@
 
 ## Etapa 1 - Ajustes e Refinos (com exemplos)
 
-[ ] 1. **agent_local.py** — Sanitizar `name` de tool antes de usar  
+[x] 1. **agent_local.py** — Sanitizar `name` de tool antes de usar
 ```python
 raw = tc.get("name", "")
 name = raw.strip().lower()
@@ -12,7 +12,7 @@ if not re.fullmatch(r"[a-z0-9._-]{1,64}", name):
 tool = get_tool(name)
 ```
 
-[ ] 2. **agent_local.py** — Redação (PII) antes de `_truncate()`  
+[x] 2. **agent_local.py** — Redação (PII) antes de `_truncate()`
 ```python
 _RE_EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 _RE_USERPATH = re.compile(r"C:\\Users\\[^\\]+", re.IGNORECASE)
@@ -27,12 +27,12 @@ def _redact(text: str) -> str:
 payload = _truncate(_redact(raw))
 ```
 
-[ ] 3. **agent_local.py** — Ativar `_shrink()` do contexto  
+[x] 3. **agent_local.py** — Ativar `_shrink()` do contexto
 ```python
 messages = _shrink(messages, max_msgs=20)
 ```
 
-[ ] 4. **agent_local.py** — Cap por reply respeitando quota restante  
+[x] 4. **agent_local.py** — Cap por reply respeitando quota restante
 ```python
 remaining = self.max_tools - tool_calls_used
 if remaining <= 0:
@@ -41,7 +41,7 @@ else:
     toolcalls = toolcalls[:remaining]
 ```
 
-[ ] 5. **agent_local.py** — Envelope de erro de tool padronizado  
+[x] 5. **agent_local.py** — Envelope de erro de tool padronizado
 ```python
 messages.append({
   "role":"tool",
@@ -51,12 +51,12 @@ messages.append({
 })
 ```
 
-[ ] 6. **agent_local.py** — Mensagem humana quando aciona circuit breaker  
+[x] 6. **agent_local.py** — Mensagem humana quando aciona circuit breaker
 ```python
 return "Falhei repetidamente ao usar ferramentas nesta tarefa. Posso tentar outro caminho (sem tools) ou você quer ajustar o pedido?"
 ```
 
-[ ] 7. **agent_local.py** — Headers opcionais para LLM (Auth)  
+[x] 7. **agent_local.py** — Headers opcionais para LLM (Auth)
 ```python
 headers = {}
 api_key = os.getenv("LLM_API_KEY", "").strip()
@@ -69,7 +69,7 @@ elif auth_hdr:
 resp = requests.post(endpoint, json=payload, headers=headers or None, timeout=timeout)
 ```
 
-[ ] 8. **agent_local.py** — Política de retries curta por tool  
+[x] 8. **agent_local.py** — Política de retries curta por tool
 ```python
 retry = int(tool.get("schema",{}).get("x-retry", 0))
 attempts = 1 + max(0, retry)
@@ -81,7 +81,7 @@ for i in range(attempts):
         time.sleep(0.2*(i+1))
 ```
 
-[ ] 9. **registry.py** — Políticas por risco de tool  
+[x] 9. **registry.py** — Políticas por risco de tool
 ```python
 if self.safe_mode and tool.get("safety") == "destructive":
     messages.append({"role":"tool","name":name,"tool_call_id":tool_call_id,
@@ -89,7 +89,7 @@ if self.safe_mode and tool.get("safety") == "destructive":
     continue
 ```
 
-[ ] 10. **agent_local.py** — Validação extra de ranges em schema  
+[x] 10. **agent_local.py** — Validação extra de ranges em schema
 ```python
 minv = spec.get("minimum"); maxv = spec.get("maximum")
 if isinstance(val,(int,float)):
@@ -97,13 +97,13 @@ if isinstance(val,(int,float)):
     if maxv is not None and val > maxv: invalid.append(key)
 ```
 
-[ ] 11. **agent_local.py** — Log de `tool_limit_reached` com hash do reply  
+[x] 11. **agent_local.py** — Log de `tool_limit_reached` com hash do reply
 ```python
 h = uuid.uuid5(uuid.NAMESPACE_OID, reply).hex[:8]
 self.log.info(json.dumps({"event":"tool_limit_reached","reply_hash":h}))
 ```
 
-[ ] 12. **agent_local.py** — Normalizar whitespace de tool replies  
+[x] 12. **agent_local.py** — Normalizar whitespace de tool replies
 ```python
 text, _ = _parse_toolcalls(final)
 return re.sub(r"\s+\n", "\n", text.strip())

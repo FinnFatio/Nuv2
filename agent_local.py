@@ -13,7 +13,7 @@ import requests
 from typing import cast
 
 from dispatcher import dispatch
-from registry import get_tool
+from registry import get_tool, violates_policy
 import settings
 import logger as _logger
 import metrics
@@ -50,6 +50,17 @@ class LLMFn(Protocol):
         ...
 
 _TOOLCALL_RE = re.compile(r"<toolcall>(.*?)</toolcall>", re.DOTALL)
+
+_RE_EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+_RE_USERPATH = re.compile(r"C:\\Users\\[^\\]+", re.IGNORECASE)
+_RE_TOKEN = re.compile(r"(?:api[_-]?key|token|secret)\s*[:=]\s*([A-Za-z0-9._-]{8,})", re.IGNORECASE)
+
+
+def _redact(text: str) -> str:
+    t = _RE_EMAIL.sub("[REDACTED_EMAIL]", text)
+    t = _RE_USERPATH.sub(lambda _: "C:\\Users\\<redacted>", t)
+    t = _RE_TOKEN.sub(lambda m: m.group(0).replace(m.group(1), "<redacted>"), t)
+    return t
 
 
 def _truncate(
@@ -155,7 +166,20 @@ def _default_llm_backend(
                     payload["max_tokens"] = max_tokens
                 if temperature is not None:
                     payload["temperature"] = temperature
-                resp = requests.post(endpoint, json=payload, timeout=timeout)
+                headers: Dict[str, str] = {}
+                api_key = os.getenv("LLM_API_KEY", "").strip()
+                auth_hdr = os.getenv("LLM_AUTH_HEADER", "").strip()
+                if api_key and not auth_hdr:
+                    headers["Authorization"] = f"Bearer {api_key}"
+                elif auth_hdr:
+                    k, v = auth_hdr.split(":", 1)
+                    headers[k.strip()] = v.strip()
+                resp = requests.post(
+                    endpoint,
+                    json=payload,
+                    headers=headers or None,
+                    timeout=timeout,
+                )
                 resp.raise_for_status()
                 data = cast(Dict[str, Any], resp.json())
                 return str(data["choices"][0]["message"]["content"])
@@ -196,6 +220,7 @@ class Agent:
         last_tool = ""
         while tool_calls_used < self.max_tools:
             turn += 1
+            messages = _shrink(messages, max_msgs=20)
             start_call = self.clock()
             res = self.llm(messages, max_tokens=256, temperature=0.2)
             if isinstance(res, tuple):
@@ -239,27 +264,34 @@ class Agent:
                     )
                 )
             text, toolcalls = _parse_toolcalls(reply)
+            remaining = self.max_tools - tool_calls_used
+            if len(toolcalls) > remaining:
+                h = uuid.uuid5(uuid.NAMESPACE_OID, reply).hex[:8]
+                self.log.info(
+                    json.dumps(
+                        {
+                            "event": "tool_limit_reached",
+                            "limit": self.max_tools,
+                            "reply_hash": h,
+                            "conversation_id": conversation_id,
+                            "turn": turn,
+                            "request_id": None,
+                            "tool_call_id": None,
+                            "safe_mode": self.safe_mode,
+                        }
+                    )
+                )
+            toolcalls = toolcalls[:remaining]
             messages.append({"role": "assistant", "content": text})
             if not toolcalls:
                 failure_streak = 0
-                return text.strip()
+                return re.sub(r"\s+\n", "\n", text.strip())
             for tc in toolcalls:
-                if tool_calls_used >= self.max_tools:
-                    self.log.info(
-                        json.dumps(
-                            {
-                                "event": "tool_limit_reached",
-                                "limit": self.max_tools,
-                                "conversation_id": conversation_id,
-                                "turn": turn,
-                                "request_id": None,
-                                "tool_call_id": None,
-                                "safe_mode": self.safe_mode,
-                            }
-                        )
-                    )
-                    break
-                name = tc.get("name", "")
+                raw = tc.get("name", "")
+                name = raw.strip().lower()
+                if not re.fullmatch(r"[a-z0-9._-]{1,64}", name):
+                    self.log.warning(json.dumps({"event": "tool_name_invalid", "raw": raw}))
+                    continue
                 if name != last_tool:
                     failure_streak = 0
                     last_tool = name
@@ -286,7 +318,14 @@ class Agent:
                             "role": "tool",
                             "name": name,
                             "tool_call_id": tool_call_id,
-                            "content": f"tool {name} unavailable",
+                            "content": json.dumps(
+                                {
+                                    "kind": "error",
+                                    "code": "unknown_tool",
+                                    "note": f"tool {name} unavailable",
+                                    "retry_safe": False,
+                                }
+                            ),
                         }
                     )
                     if failure_streak >= 3:
@@ -300,7 +339,22 @@ class Agent:
                                 }
                             )
                         )
-                        return "tool failures exceeded"
+                        return (
+                            "Falhei repetidamente ao usar ferramentas nesta tarefa. "
+                            "Posso tentar outro caminho (sem tools) ou você quer ajustar o pedido?"
+                        )
+                    continue
+                if violates_policy(tool, self.safe_mode):
+                    messages.append(
+                        {
+                            "role": "tool",
+                            "name": name,
+                            "tool_call_id": tool_call_id,
+                            "content": json.dumps(
+                                {"kind": "error", "code": "forbidden_in_safe_mode"}
+                            ),
+                        }
+                    )
                     continue
                 if self.safe_mode and not tool.get("enabled_in_safe_mode", False):
                     self.log.warning(
@@ -321,7 +375,14 @@ class Agent:
                             "role": "tool",
                             "name": name,
                             "tool_call_id": tool_call_id,
-                            "content": f"tool {name} disabled in safe_mode",
+                            "content": json.dumps(
+                                {
+                                    "kind": "error",
+                                    "code": "disabled_in_safe_mode",
+                                    "note": f"tool {name} disabled in safe_mode",
+                                    "retry_safe": False,
+                                }
+                            ),
                         }
                     )
                     continue
@@ -350,7 +411,14 @@ class Agent:
                                 "role": "tool",
                                 "name": name,
                                 "tool_call_id": tool_call_id,
-                                "content": "missing args: " + ", ".join(missing),
+                                "content": json.dumps(
+                                    {
+                                        "kind": "error",
+                                        "code": "missing_args",
+                                        "note": ", ".join(missing),
+                                        "retry_safe": False,
+                                    }
+                                ),
                             }
                         )
                         if failure_streak >= 3:
@@ -364,7 +432,10 @@ class Agent:
                                     }
                                 )
                             )
-                            return "tool failures exceeded"
+                            return (
+                                "Falhei repetidamente ao usar ferramentas nesta tarefa. "
+                                "Posso tentar outro caminho (sem tools) ou você quer ajustar o pedido?"
+                            )
                         continue
                     props = schema.get("properties", {})
                     invalid: List[str] = []
@@ -378,6 +449,13 @@ class Agent:
                                 invalid.append(key)
                             elif expected == "object" and not isinstance(val, dict):
                                 invalid.append(key)
+                            minv = spec.get("minimum")
+                            maxv = spec.get("maximum")
+                            if isinstance(val, (int, float)):
+                                if minv is not None and val < minv:
+                                    invalid.append(key)
+                                if maxv is not None and val > maxv:
+                                    invalid.append(key)
                     if invalid:
                         failure_streak += 1
                         self.log.warning(
@@ -399,7 +477,14 @@ class Agent:
                                 "role": "tool",
                                 "name": name,
                                 "tool_call_id": tool_call_id,
-                                "content": "invalid type for: " + ", ".join(invalid),
+                                "content": json.dumps(
+                                    {
+                                        "kind": "error",
+                                        "code": "invalid_type",
+                                        "note": ", ".join(invalid),
+                                        "retry_safe": False,
+                                    }
+                                ),
                             }
                         )
                         if failure_streak >= 3:
@@ -413,29 +498,44 @@ class Agent:
                                     }
                                 )
                             )
-                            return "tool failures exceeded"
+                            return (
+                                "Falhei repetidamente ao usar ferramentas nesta tarefa. "
+                                "Posso tentar outro caminho (sem tools) ou você quer ajustar o pedido?"
+                            )
                         continue
-                start = self.clock()
-                envelope = dispatch(tc, request_id=request_id, safe_mode=self.safe_mode)
-                raw = json.dumps(envelope, ensure_ascii=False)
-                payload = _truncate(raw)
-                elapsed_ms = int((self.clock() - start) * 1000)
-                self.log.info(
-                    json.dumps(
-                        {
-                            "event": "toolcall",
-                            "name": name,
-                            "elapsed_ms": elapsed_ms,
-                            "size_before": len(raw),
-                            "size_after": len(payload),
-                            "conversation_id": conversation_id,
-                            "turn": turn,
-                            "request_id": request_id,
-                            "tool_call_id": tool_call_id,
-                            "safe_mode": self.safe_mode,
-                        }
+                retry = int((schema or {}).get("x-retry", 0))
+                attempts = 1 + max(0, retry)
+                envelope: Dict[str, Any] = {}
+                payload = ""
+                for i in range(attempts):
+                    start = self.clock()
+                    envelope = dispatch(tc, request_id=request_id, safe_mode=self.safe_mode)
+                    raw = json.dumps(envelope, ensure_ascii=False)
+                    payload = _truncate(_redact(raw))
+                    elapsed_ms = int((self.clock() - start) * 1000)
+                    self.log.info(
+                        json.dumps(
+                            {
+                                "event": "toolcall",
+                                "name": name,
+                                "elapsed_ms": elapsed_ms,
+                                "size_before": len(raw),
+                                "size_after": len(payload),
+                                "conversation_id": conversation_id,
+                                "turn": turn,
+                                "request_id": request_id,
+                                "tool_call_id": tool_call_id,
+                                "safe_mode": self.safe_mode,
+                                "attempt": i + 1,
+                                "attempts": attempts,
+                            }
+                        )
                     )
-                )
+                    if envelope.get("kind") != "error":
+                        break
+                    if i + 1 < attempts:
+                        time.sleep(0.2 * (i + 1))
+
                 messages.append(
                     {
                         "role": "tool",
@@ -460,12 +560,16 @@ class Agent:
                             }
                         )
                     )
-                    return "tool failures exceeded"
-                messages = _shrink(messages)
+                    return (
+                        "Falhei repetidamente ao usar ferramentas nesta tarefa. "
+                        "Posso tentar outro caminho (sem tools) ou você quer ajustar o pedido?"
+                    )
+                messages = _shrink(messages, max_msgs=20)
 
         turn += 1
+        messages = _shrink(messages, max_msgs=20)
         start_call = self.clock()
-        res = self.llm(_shrink(messages))
+        res = self.llm(messages)
         if isinstance(res, tuple):
             final, usage = res
         else:
@@ -509,7 +613,7 @@ class Agent:
                 )
             )
         text, _ = _parse_toolcalls(final)
-        return text.strip()
+        return re.sub(r"\s+\n", "\n", text.strip())
 
 
 __all__ = [
