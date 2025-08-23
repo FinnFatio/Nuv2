@@ -10,6 +10,7 @@ _times: Dict[str, Deque[int]] = {
     "uia": deque(maxlen=_WINDOW),
     "capture": deque(maxlen=_WINDOW),
     "ocr": deque(maxlen=_WINDOW),
+    "agent": deque(maxlen=_WINDOW),
 }
 _fallbacks: Counter[str] = Counter()
 _route_total: Counter[str] = Counter()
@@ -18,9 +19,16 @@ _route_status: Counter[Tuple[str, str]] = Counter()
 _rate_limited_total = 0
 _gauges: Dict[str, int | float | Dict[str, int | float]] = {}
 _enums: Dict[str, Counter[str]] = {}
-_policy_blocked: Counter[str] = Counter()
+_agent_policy_blocks: Counter[str] = Counter()
 _tool_calls: Counter[Tuple[str, str]] = Counter()
 _tool_latency: Dict[str, Deque[int]] = {}
+_agent_tool_calls: Counter[Tuple[str, str]] = Counter()
+_agent_tool_latency: Dict[str, Deque[int]] = {}
+
+
+def record_agent_turn(elapsed_ms: int) -> None:
+    """Record elapsed time for an agent turn."""
+    record_time("agent", elapsed_ms)
 
 
 def record_time(kind: str, elapsed_ms: int) -> None:
@@ -49,12 +57,17 @@ def record_enum(name: str, value: str) -> None:
 
 
 def record_policy_block(reason: str) -> None:
-    _policy_blocked[reason] += 1
+    _agent_policy_blocks[reason] += 1
 
 
 def record_tool_call(name: str, outcome: str, elapsed_ms: int) -> None:
     _tool_calls[(name, outcome)] += 1
     _tool_latency.setdefault(name, deque(maxlen=_WINDOW)).append(int(elapsed_ms))
+
+
+def record_agent_tool_use(name: str, outcome: str, elapsed_ms: int) -> None:
+    _agent_tool_calls[(name, outcome)] += 1
+    _agent_tool_latency.setdefault(name, deque(maxlen=_WINDOW)).append(int(elapsed_ms))
 
 
 def record_request(route: str, status: int) -> None:
@@ -89,6 +102,7 @@ def summary() -> Dict:
         }
         for kind, dq in _times.items()
     }
+    agent_turn = latency.pop("agent", None)
     error_rate = {
         route: (_route_errors[route] / total if total else 0.0)
         for route, total in _route_total.items()
@@ -103,8 +117,16 @@ def summary() -> Dict:
     tool_calls: Dict[str, Dict[str, int]] = {}
     for (name, outcome), count in _tool_calls.items():
         tool_calls.setdefault(name, {})[outcome] = count
+    agent_tool_latency = {
+        name: {"p50": _percentile(dq, 50), "p95": _percentile(dq, 95)}
+        for name, dq in _agent_tool_latency.items()
+    }
+    agent_tool_calls: Dict[str, Dict[str, int]] = {}
+    for (name, outcome), count in _agent_tool_calls.items():
+        agent_tool_calls.setdefault(name, {})[outcome] = count
     return {
         "latency_ms": latency,
+        "agent_turn_ms": agent_turn,
         "fallbacks": dict(_fallbacks),
         "error_rate": error_rate,
         "status_total": status_total,
@@ -112,8 +134,11 @@ def summary() -> Dict:
         "resets_total": _fallbacks.get("resets", 0),
         "gauges": dict(_gauges),
         "enums": {k: dict(v) for k, v in _enums.items()},
-        "policy_blocked_total": dict(_policy_blocked),
+        "agent_policy_blocks_total": dict(_agent_policy_blocks),
+        "policy_blocked_total": dict(_agent_policy_blocks),
+        "agent_tool_uses_total": agent_tool_calls,
         "tool_calls_total": tool_calls,
+        "agent_tool_latency_ms": agent_tool_latency,
         "tool_latency_ms": tool_latency,
     }
 
@@ -129,6 +154,8 @@ def reset() -> None:
     _enums.clear()
     global _rate_limited_total
     _rate_limited_total = 0
-    _policy_blocked.clear()
+    _agent_policy_blocks.clear()
     _tool_calls.clear()
     _tool_latency.clear()
+    _agent_tool_calls.clear()
+    _agent_tool_latency.clear()
