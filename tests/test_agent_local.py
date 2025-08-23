@@ -1,5 +1,6 @@
 import agent_local
 import json
+import uuid
 
 import logger
 from typing import Any, List, Dict
@@ -83,7 +84,9 @@ def test_agent_unknown_tool_feedback():
             if self.calls == 1:
                 return '<toolcall>{"name":"missing"}</toolcall>'
             assert messages[-1]["role"] == "tool"
-            assert "unavailable" in messages[-1]["content"]
+            content = json.loads(messages[-1]["content"])
+            assert content["kind"] == "error"
+            assert content["code"] == "unknown_tool"
             return "done"
 
     llm = LLM()
@@ -96,7 +99,9 @@ def test_agent_invalid_args(monkeypatch):
         if len(messages) == 1:
             return '<toolcall>{"name":"echo","args":{}}</toolcall>'
         assert messages[-1]["role"] == "tool"
-        assert "missing args" in messages[-1]["content"]
+        content = json.loads(messages[-1]["content"])
+        assert content["kind"] == "error"
+        assert content["code"] == "missing_args"
         return "done"
 
     called = False
@@ -222,5 +227,197 @@ def test_circuit_breaker_on_failures(monkeypatch):
     )
     monkeypatch.setattr(agent_local, "dispatch", lambda req, request_id, safe_mode: {"kind": "error"})
     agent = Agent(llm=LLM(), log=log)
-    assert agent.chat("hi") == "tool failures exceeded"
+    assert (
+        agent.chat("hi")
+        == "Falhei repetidamente ao usar ferramentas nesta tarefa. Posso tentar outro caminho (sem tools) ou você quer ajustar o pedido?"
+    )
     assert any(l.get("event") == "circuit_breaker" for l in log.logs)
+
+
+def test_llm_headers_api_key(monkeypatch):
+    captured: list[dict[str, str] | None] = []
+
+    def fake_post(url, json=None, headers=None, timeout=None):
+        captured.append(headers)
+        class Resp:
+            def raise_for_status(self):
+                pass
+            def json(self):
+                return {"choices": [{"message": {"content": "hi"}}]}
+        return Resp()
+
+    monkeypatch.setenv("LLM_ENDPOINT", "http://llm")
+    monkeypatch.setenv("LLM_MODEL", "gpt")
+    monkeypatch.setenv("LLM_API_KEY", "abc")
+    monkeypatch.delenv("LLM_AUTH_HEADER", raising=False)
+    monkeypatch.setattr(agent_local.requests, "post", fake_post)
+    chat = agent_local._default_llm_backend()
+    assert chat([{ "role": "user", "content": "hi" }]) == "hi"
+    assert captured[0]["Authorization"] == "Bearer abc"
+
+
+def test_llm_headers_custom_header(monkeypatch):
+    captured: list[dict[str, str] | None] = []
+
+    def fake_post(url, json=None, headers=None, timeout=None):
+        captured.append(headers)
+        class Resp:
+            def raise_for_status(self):
+                pass
+            def json(self):
+                return {"choices": [{"message": {"content": "hi"}}]}
+        return Resp()
+
+    monkeypatch.setenv("LLM_ENDPOINT", "http://llm")
+    monkeypatch.setenv("LLM_MODEL", "gpt")
+    monkeypatch.setenv("LLM_AUTH_HEADER", "X-Test: 123")
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    monkeypatch.setattr(agent_local.requests, "post", fake_post)
+    chat = agent_local._default_llm_backend()
+    assert chat([{ "role": "user", "content": "hi" }]) == "hi"
+    assert captured[0]["X-Test"] == "123"
+
+
+def test_tool_retry_policy(monkeypatch):
+    class LLM:
+        def __init__(self):
+            self.calls = 0
+        def __call__(self, messages, **kwargs):
+            self.calls += 1
+            if self.calls == 1:
+                return '<toolcall>{"name":"echo","id":"1"}</toolcall>'
+            assert messages[-1]["role"] == "tool"
+            return "done"
+
+    attempts = []
+
+    def fake_dispatch(req, request_id, safe_mode):
+        attempts.append(None)
+        if len(attempts) == 1:
+            return {"kind": "error"}
+        return {"kind": "ok"}
+
+    monkeypatch.setattr(agent_local, "dispatch", fake_dispatch)
+    monkeypatch.setattr(
+        agent_local,
+        "get_tool",
+        lambda name: {"name": name, "enabled_in_safe_mode": True, "schema": {"x-retry": 1}},
+    )
+    monkeypatch.setattr(agent_local.time, "sleep", lambda s: None)
+    agent = Agent(llm=LLM())
+    assert agent.chat("hi") == "done"
+    assert len(attempts) == 2
+
+
+def test_safe_mode_blocks_destructive(monkeypatch):
+    class LLM:
+        def __init__(self):
+            self.calls = 0
+        def __call__(self, messages, **kwargs):
+            self.calls += 1
+            if self.calls == 1:
+                return '<toolcall>{"name":"boom"}</toolcall>'
+            assert messages[-1]["role"] == "tool"
+            content = json.loads(messages[-1]["content"])
+            assert content["code"] == "forbidden_in_safe_mode"
+            return "done"
+
+    called = False
+
+    def fake_dispatch(req, request_id, safe_mode):
+        nonlocal called
+        called = True
+        return {"kind": "ok"}
+
+    monkeypatch.setattr(agent_local, "dispatch", fake_dispatch)
+    monkeypatch.setattr(
+        agent_local,
+        "get_tool",
+        lambda name: {"name": name, "enabled_in_safe_mode": True, "safety": "destructive"},
+    )
+    agent = Agent(llm=LLM())
+    assert agent.chat("hi") == "done"
+    assert called is False
+
+
+def test_agent_range_validation(monkeypatch):
+    def llm(messages, **kwargs):
+        if len(messages) == 1:
+            return '<toolcall>{"name":"echo","args":{"num":5}}</toolcall>'
+        assert messages[-1]["role"] == "tool"
+        content = json.loads(messages[-1]["content"])
+        assert content["code"] == "invalid_type"
+        return "ok"
+
+    called = False
+
+    def fake_dispatch(req, request_id, safe_mode):
+        nonlocal called
+        called = True
+        return {"kind": "ok"}
+
+    monkeypatch.setattr(agent_local, "dispatch", fake_dispatch)
+    monkeypatch.setattr(
+        agent_local,
+        "get_tool",
+        lambda name: {
+            "name": name,
+            "enabled_in_safe_mode": True,
+            "schema": {
+                "required": ["num"],
+                "properties": {"num": {"type": "integer", "minimum": 10}},
+            },
+        },
+    )
+
+    agent = Agent(llm=llm)
+    assert agent.chat("hi") == "ok"
+    assert called is False
+
+
+def test_tool_limit_reached_logs_hash(monkeypatch):
+    class LLM:
+        def __init__(self):
+            self.calls = 0
+
+        def __call__(self, messages, **kwargs):
+            self.calls += 1
+            if self.calls == 1:
+                return (
+                    '<toolcall>{"name":"echo","args":{}}</toolcall>'
+                    '<toolcall>{"name":"echo","args":{}}</toolcall>'
+                )
+            return "done"
+
+    class DummyLogger:
+        def __init__(self):
+            self.logs: List[Dict[str, Any]] = []
+
+        def info(self, msg: str) -> None:
+            self.logs.append(json.loads(msg))
+
+        def warning(self, msg: str) -> None:
+            self.logs.append(json.loads(msg))
+
+    log = DummyLogger()
+    monkeypatch.setattr(agent_local, "dispatch", lambda req, request_id, safe_mode: {"kind": "ok"})
+    monkeypatch.setattr(
+        agent_local, "get_tool", lambda name: {"name": name, "enabled_in_safe_mode": True}
+    )
+
+    agent = Agent(llm=LLM(), max_tools=1, log=log)
+    assert agent.chat("hi") == "done"
+    evt = next(l for l in log.logs if l.get("event") == "tool_limit_reached")
+    expected = uuid.uuid5(
+        uuid.NAMESPACE_OID,
+        '<toolcall>{"name":"echo","args":{}}</toolcall><toolcall>{"name":"echo","args":{}}</toolcall>',
+    ).hex[:8]
+    assert evt["reply_hash"] == expected
+
+
+def test_whitespace_normalized_in_reply():
+    def llm(messages, **kwargs):
+        return "line1   \nline2\n"
+
+    agent = Agent(llm=llm, max_tools=0)
+    assert agent.chat("hi") == "line1\nline2"

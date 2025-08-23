@@ -38,3 +38,7 @@ def get_tool(name: str) -> Dict[str, Any] | None:
 
 def clear() -> None:
     REGISTRY.clear()
+
+
+def violates_policy(tool: Dict[str, Any], safe_mode: bool) -> bool:
+    return safe_mode and tool.get("safety") == "destructive"
