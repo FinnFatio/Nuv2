@@ -5,3 +5,6 @@ logs/
 *.out
 *.tmp
 .coverage
+llm_eval_results.json
+llm_eval_results.csv
+experiments/llm_sandbox/assets/sample.png
