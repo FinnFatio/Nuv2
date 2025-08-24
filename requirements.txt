@@ -8,3 +8,4 @@ httpx
 pygetwindow  # optional
 uvicorn
 requests
+llama-cpp-python>=0.2.90 # fallback local; wheel padrão é CPU-only
