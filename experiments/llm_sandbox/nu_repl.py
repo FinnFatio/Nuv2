@@ -18,17 +18,21 @@ _local_llm = None
 _logged = False
 
 
+_PREAMBLE = (
+    "Você é a Nu. Se o pedido exigir ferramenta, responda APENAS com "
+    '<toolcall>{"name":"...","args":{...}}</toolcall>. '
+    "Ferramentas disponíveis (read-only, LLM-0): system.capture_screen(); "
+    "system.ocr(path); system.info(); fs.list(path?); fs.read(path); "
+    "web.read(url). Depois que eu te enviar o resultado da tool, você "
+    "poderá responder ao usuário."
+)
+
+
 def _with_preamble(msgs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return (
         msgs
         if any(m.get("role") == "system" for m in msgs)
-        else [
-            {
-                "role": "system",
-                "content": "Você é a Nu. Se o pedido exigir ferramenta, responda APENAS com <toolcall>{\\"name\\":\\"...\\",\\"args\\":{...}}</toolcall>. Ferramentas disponíveis (read-only, LLM-0): system.capture_screen(); system.ocr(path); system.info(); fs.list(path?); fs.read(path); web.read(url). Depois que eu te enviar o resultado da tool, você poderá responder ao usuário.",
-            }
-        ]
-        + msgs
+        else [{"role": "system", "content": _PREAMBLE}] + msgs
     )
 
 

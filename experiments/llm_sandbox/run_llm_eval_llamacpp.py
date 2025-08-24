@@ -17,9 +17,7 @@ import requests  # type: ignore[import-untyped]
 
 from agent_local import Agent, _parse_toolcalls
 
-SAMPLE_PNG_B64 = (
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y0bZ9wAAAAASUVORK5CYII="
-)  # PNG 1x1
+SAMPLE_PNG_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y0bZ9wAAAAASUVORK5CYII="  # PNG 1x1
 
 
 def ensure_sample_png(path: str) -> None:
@@ -33,17 +31,21 @@ _local_llm = None
 _logged = False
 
 
+_PREAMBLE = (
+    "Você é a Nu. Se o pedido exigir ferramenta, responda APENAS com "
+    '<toolcall>{"name":"...","args":{...}}</toolcall>. '
+    "Ferramentas disponíveis (read-only, LLM-0): system.capture_screen(); "
+    "system.ocr(path); system.info(); fs.list(path?); fs.read(path); "
+    "web.read(url). Depois que eu te enviar o resultado da tool, você "
+    "poderá responder ao usuário."
+)
+
+
 def _with_preamble(msgs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return (
         msgs
         if any(m.get("role") == "system" for m in msgs)
-        else [
-            {
-                "role": "system",
-                "content": "Você é a Nu. Se o pedido exigir ferramenta, responda APENAS com <toolcall>{\\"name\\":\\"...\\",\\"args\\":{...}}</toolcall>. Ferramentas disponíveis (read-only, LLM-0): system.capture_screen(); system.ocr(path); system.info(); fs.list(path?); fs.read(path); web.read(url). Depois que eu te enviar o resultado da tool, você poderá responder ao usuário.",
-            }
-        ]
-        + msgs
+        else [{"role": "system", "content": _PREAMBLE}] + msgs
     )
 
 
@@ -132,7 +134,9 @@ def main() -> None:
             status = "expected_error"
         results.append({"prompt": p, "output": output, "status": status})
     out_path = Path("llm_eval_results.json")
-    out_path.write_text(json.dumps(results, indent=2, ensure_ascii=False), encoding="utf-8")
+    out_path.write_text(
+        json.dumps(results, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
     print(json.dumps(results, indent=2, ensure_ascii=False))
 
 
