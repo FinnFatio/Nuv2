@@ -44,25 +44,31 @@ _logged = False
 _local_llm = None
 
 
+PRE = (
+    "Você é a Nu. Se o pedido exigir ferramenta, responda APENAS com "
+    '<toolcall>{"name":"...","args":{...}}</toolcall>. '
+    "Ferramentas (read-only, LLM-0): system.capture_screen(); system.ocr(path); "
+    "system.info(); fs.list(path?); fs.read(path); web.read(url). Depois que eu te "
+    "enviar o resultado da tool, você poderá responder ao usuário."
+)
+
+
 def _with_preamble(msgs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    return (
-        msgs
-        if any(m.get("role") == "system" for m in msgs)
-        else [
-            {
-                "role": "system",
-                "content": (
-                    "Você é a Nu. Se o pedido exigir ferramenta, responda APENAS com "
-                    '<toolcall>{"name":"...","args":{...}}</toolcall>. '
-                    "Ferramentas disponíveis (read-only, LLM-0): system.capture_screen(); "
-                    "system.ocr(path); system.info(); fs.list(path?); fs.read(path); "
-                    "web.read(url). Depois que eu te enviar o resultado da tool, você "
-                    "poderá responder ao usuário."
-                ),
-            }
-        ]
-        + msgs
+    out = list(msgs)
+    idx_last_sys = max(
+        (i for i, m in enumerate(out) if m.get("role") == "system"),
+        default=-1,
     )
+    if idx_last_sys >= 0 and str(out[idx_last_sys].get("content", "")).startswith(
+        "[remaining_tools="
+    ):
+        out[idx_last_sys] = {
+            "role": "system",
+            "content": PRE + " " + out[idx_last_sys]["content"],
+        }
+    else:
+        out = [{"role": "system", "content": PRE}] + out
+    return out
 
 
 def llamacpp_chat(
