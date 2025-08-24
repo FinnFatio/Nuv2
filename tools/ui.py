@@ -27,7 +27,13 @@ def what_under_mouse() -> Dict[str, Any]:
     window: Dict[str, Any] | None = None
     if gw is not None:
         try:
-            w = gw.getActiveWindow()
+            w = None
+            if hasattr(gw, "getWindowsAt"):
+                ws = gw.getWindowsAt(pos["x"], pos["y"])
+                if ws:
+                    w = ws[0]
+            if w is None:
+                w = gw.getActiveWindow()
             if w is not None:
                 title = getattr(w, "title", "") or ""
                 app = ""
