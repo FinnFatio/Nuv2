@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from registry import register_tool
-from . import system, fs, archive, web
+from . import system, fs, archive, web, ui
 
 __all__ = ["register_all_tools"]
 
@@ -96,4 +96,38 @@ def register_all_tools() -> None:
         rate_limit_per_min=30,
         enabled_in_safe_mode=True,
         func=web.read,
+    )
+    register_tool(
+        name="ui.what_under_mouse",
+        version="1",
+        summary="cursor position and UI element",
+        safety="read",
+        timeout_ms=1000,
+        rate_limit_per_min=60,
+        enabled_in_safe_mode=True,
+        func=ui.what_under_mouse,
+        schema={
+            "args": {"type": "object", "properties": {}},
+            "returns": {
+                "type": "object",
+                "properties": {
+                    "x": {"type": "integer"},
+                    "y": {"type": "integer"},
+                    "window": {
+                        "type": ["object", "null"],
+                        "properties": {
+                            "title": {"type": "string"},
+                            "app": {"type": "string"},
+                        },
+                    },
+                    "control": {
+                        "type": ["object", "null"],
+                        "properties": {
+                            "role": {"type": "string"},
+                            "name": {"type": "string"},
+                        },
+                    },
+                },
+            },
+        },
     )

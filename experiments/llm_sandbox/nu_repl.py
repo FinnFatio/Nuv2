@@ -31,9 +31,33 @@ PRE = (
     "Você é a Nu. Se o pedido exigir ferramenta, responda APENAS com "
     '<toolcall>{"name":"...","args":{...}}</toolcall>. '
     "Ferramentas (read-only, LLM-0): system.capture_screen(); system.ocr(path); "
-    "system.info(); fs.list(path?); fs.read(path); web.read(url). Depois que eu te "
-    "enviar o resultado da tool, você poderá responder ao usuário."
+    "system.info(); fs.list(path?); fs.read(path); web.read(url). "
+    "Quando decidir usar ferramenta, responda APENAS com "
+    '<toolcall>{"name":"...","args":{...}}</toolcall> '
+    "(nunca texto junto); para URLs use sempre web.read(url); para listar arquivos, "
+    "sempre fs.list(path?). Depois que eu te enviar o resultado da tool, você "
+    "poderá responder ao usuário."
 )
+
+
+_FEW_SHOT = [
+    {"role": "user", "content": "Tire um screenshot."},
+    {
+        "role": "assistant",
+        "content": '<toolcall>{"name":"system.capture_screen","args":{}}</toolcall>',
+    },
+    {"role": "user", "content": "Resumo de https://ex.com"},
+    {
+        "role": "assistant",
+        "content": '<toolcall>{"name":"web.read","args":{"url":"https://ex.com"}}</toolcall>',
+    },
+]
+
+
+def _with_examples(msgs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    if not any(m.get("role") in {"user", "system"} for m in msgs[:-1]):
+        return _FEW_SHOT + list(msgs)
+    return list(msgs)
 
 
 def _with_preamble(msgs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -62,9 +86,12 @@ def llamacpp_chat(
 ) -> Dict[str, Any]:
     """Minimal wrapper for llama.cpp compatible endpoints."""
     global _local_llm, _logged
+    messages = _with_examples(messages)
     messages = _with_preamble(messages)
     endpoint = os.getenv("LLM_ENDPOINT")
     model = os.getenv("LLM_MODEL", "llama")
+    if temperature is None:
+        temperature = 0.2
     if endpoint:
         if not _logged:
             print(f"[llm] endpoint={endpoint} model={model}")
@@ -109,7 +136,7 @@ def llamacpp_chat(
         messages=messages,
         max_tokens=max_tokens,
         temperature=temperature,
-        stop=["</toolcall>", "</s>"],
+        stop=STOP,
     )
     content = str(result["choices"][0]["message"]["content"])
     text, toolcalls = _parse_toolcalls(content)

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import ast
 import uuid
 import time
 import random
@@ -317,10 +318,25 @@ class Agent:
             toolcalls = toolcalls[:remaining]
             messages.append({"role": "assistant", "content": text})
             if not toolcalls:
-                failure_streak = 0
-                elapsed_turn = int((self.clock() - start_turn) * 1000)
-                metrics.record_agent_turn(elapsed_turn)
-                return re.sub(r"\s+\n", "\n", text.strip())
+                match = re.fullmatch(r"\s*([a-z0-9._-]{1,64})\s*\((.*)\)\s*", text, re.I)
+                if match:
+                    name = match.group(1).lower()
+                    arg_str = match.group(2)
+                    if not arg_str.strip():
+                        args = {}
+                    else:
+                        try:
+                            args = ast.literal_eval("{" + arg_str + "}")
+                            if not isinstance(args, dict):
+                                args = {}
+                        except Exception:
+                            args = {}
+                    toolcalls = [{"name": name, "args": args, "id": str(uuid.uuid4())}]
+                else:
+                    failure_streak = 0
+                    elapsed_turn = int((self.clock() - start_turn) * 1000)
+                    metrics.record_agent_turn(elapsed_turn)
+                    return re.sub(r"\s+\n", "\n", text.strip())
             for tc in toolcalls:
                 raw = tc.get("name", "")
                 name = raw.strip().lower()
