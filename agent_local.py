@@ -10,7 +10,7 @@ import logging
 import hashlib
 from typing import Any, Dict, List, Tuple, TypedDict, Protocol, Callable
 
-import requests
+import requests  # type: ignore[import-untyped]
 from typing import cast
 
 from dispatcher import dispatch
@@ -249,10 +249,18 @@ class Agent:
                 max_tokens=self.max_tokens,
                 temperature=self.temperature,
             )
-            if isinstance(res, tuple):
-                reply, usage = res
+            if isinstance(res, dict):
+                raw = str(res.get("text", ""))
+                toolcalls = list(res.get("toolcalls", []))
+                usage = res.get("usage")
+                text = raw
             else:
-                reply, usage = res, None
+                if isinstance(res, tuple):
+                    raw, usage = res
+                else:
+                    raw, usage = res, None
+                raw = str(raw)
+                text, toolcalls = _parse_toolcalls(raw)
             elapsed = self.clock() - start_call
             if usage and isinstance(usage.get("completion_tokens"), int):
                 tokens = usage.get("completion_tokens", 0)
@@ -273,7 +281,7 @@ class Agent:
                     )
                 )
             else:
-                approx_tokens = len(reply.split())
+                approx_tokens = len(raw.split())
                 tps = approx_tokens / elapsed if elapsed > 0 else float("inf")
                 metrics.record_gauge("tokens_per_sec", tps, label=self.model)
                 self.log.info(
@@ -289,10 +297,9 @@ class Agent:
                         }
                     )
                 )
-            text, toolcalls = _parse_toolcalls(reply)
             remaining = self.max_tools - tool_calls_used
             if len(toolcalls) > remaining:
-                h = uuid.uuid5(uuid.NAMESPACE_OID, reply).hex[:8]
+                h = uuid.uuid5(uuid.NAMESPACE_OID, raw).hex[:8]
                 self.log.info(
                     json.dumps(
                         {
@@ -660,10 +667,15 @@ class Agent:
             max_tokens=self.max_tokens,
             temperature=self.temperature,
         )
-        if isinstance(res, tuple):
-            final, usage = res
+        if isinstance(res, dict):
+            final = str(res.get("text", ""))
+            usage = res.get("usage")
         else:
-            final, usage = res, None
+            if isinstance(res, tuple):
+                final, usage = res
+            else:
+                final, usage = res, None
+            final = str(final)
         elapsed = self.clock() - start_call
         if usage and isinstance(usage.get("completion_tokens"), int):
             tokens = usage.get("completion_tokens", 0)
@@ -702,7 +714,9 @@ class Agent:
                     }
                 )
             )
-        text, _ = _parse_toolcalls(final)
+        if not isinstance(res, dict):
+            final, _ = _parse_toolcalls(final)
+        text = final
         elapsed_turn = int((self.clock() - start_turn) * 1000)
         metrics.record_agent_turn(elapsed_turn)
         return re.sub(r"\s+\n", "\n", text.strip())
