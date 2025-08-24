@@ -59,12 +59,17 @@ Os milestones LLM-0…LLM-3 representam a evolução de um **agente local** → 
   **Prioridade:** P1 • **Size:** S
 
 - [x] **Etapa 4: Testes E2E mínimos (sem rede real)**
-  Arquivos: `tests/test_agent_local.py`  
-  **DoD:**  
-  - “O que é entropia?” → resposta **sem** tool.  
-  - “dólar hoje?” → exatamente **1** chamada `web.read` (stub) e citação da fonte/data.  
-  - Pedido de tool **não planejada** → bloqueio por policy (`forbidden`).  
+  Arquivos: `tests/test_agent_local.py`
+  **DoD:**
+  - “O que é entropia?” → resposta **sem** tool.
+  - “dólar hoje?” → exatamente **1** chamada `web.read` (stub) e citação da fonte/data.
+  - Pedido de tool **não planejada** → bloqueio por policy (`forbidden`).
   **Prioridade:** P0 • **Size:** S
+
+- [ ] **Etapa final: Contrato da LLM**
+  Arquivos: `agent_local.py`
+  **DoD:** suporte a stop tokens `</toolcall>` e `</s>` via wrapper `chat(messages)->{text,toolcalls,usage}`; o wrapper deve aceitar/passar `stop=["</toolcall>","</s>"]` e o Agent deve aceitar resposta em dict (`{text, toolcalls, usage}`) ou string (fazendo o parse).
+  **Prioridade:** P1 • **Size:** S
 
 **Metas de qualidade (LLM‑0 DoD global):**
 - ≥ **90%** das perguntas conceituais resolvidas **sem** tool.  
