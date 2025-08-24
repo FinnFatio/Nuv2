@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import List
+import re
 
 import metrics
 
@@ -41,6 +42,8 @@ class Policy:
         if any(
             k in text for k in ["price", "preço", "news", "notícia", "weather", "meteo"]
         ):
+            tools.append("web.read")
+        if "web.read" not in tools and re.search(r"https?://\S+", message):
             tools.append("web.read")
         if any(
             k in text

@@ -325,12 +325,28 @@ class Agent:
                     if not arg_str.strip():
                         args = {}
                     else:
-                        try:
-                            args = ast.literal_eval("{" + arg_str + "}")
-                            if not isinstance(args, dict):
+                        arg_str = arg_str.strip()
+                        if arg_str.startswith('{'):
+                            try:
+                                args = json.loads(arg_str)
+                            except Exception:
+                                try:
+                                    args = ast.literal_eval("{" + arg_str + "}")
+                                except Exception:
+                                    args = {}
+                        else:
+                            try:
+                                args = ast.literal_eval("{" + arg_str + "}")
+                            except Exception:
                                 args = {}
-                        except Exception:
+                        if not isinstance(args, dict):
                             args = {}
+                        else:
+                            try:
+                                if len(json.dumps(args)) > 2000:
+                                    args = {}
+                            except Exception:
+                                args = {}
                     toolcalls = [{"name": name, "args": args, "id": str(uuid.uuid4())}]
                 else:
                     failure_streak = 0
@@ -589,6 +605,7 @@ class Agent:
                 attempts = 1 + max(0, retry)
                 envelope: Dict[str, Any] = {}
                 payload = ""
+                metrics.record_agent_tool_name(name)
                 for i in range(attempts):
                     start = self.clock()
                     envelope = dispatch(

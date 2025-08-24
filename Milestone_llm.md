@@ -66,7 +66,7 @@ Os milestones LLM-0…LLM-3 representam a evolução de um **agente local** → 
   - Pedido de tool **não planejada** → bloqueio por policy (`forbidden`).
   **Prioridade:** P0 • **Size:** S
 
-- [ ] **Etapa final: Contrato da LLM**
+ - [x] **Etapa final: Contrato da LLM**
   Arquivos: `agent_local.py`
   **DoD:** suporte a stop tokens `</toolcall>` e `</s>` via wrapper `chat(messages)->{text,toolcalls,usage}`; o wrapper deve aceitar/passar `stop=["</toolcall>","</s>"]` e o Agent deve aceitar resposta em dict (`{text, toolcalls, usage}`) ou string (fazendo o parse).
   **Prioridade:** P1 • **Size:** S

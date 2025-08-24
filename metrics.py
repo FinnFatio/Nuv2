@@ -24,6 +24,7 @@ _tool_calls: Counter[Tuple[str, str]] = Counter()
 _tool_latency: Dict[str, Deque[int]] = {}
 _agent_tool_calls: Counter[Tuple[str, str]] = Counter()
 _agent_tool_latency: Dict[str, Deque[int]] = {}
+_agent_tool_name_total: Counter[str] = Counter()
 
 
 def record_agent_turn(elapsed_ms: int) -> None:
@@ -68,6 +69,10 @@ def record_tool_call(name: str, outcome: str, elapsed_ms: int) -> None:
 def record_agent_tool_use(name: str, outcome: str, elapsed_ms: int) -> None:
     _agent_tool_calls[(name, outcome)] += 1
     _agent_tool_latency.setdefault(name, deque(maxlen=_WINDOW)).append(int(elapsed_ms))
+
+
+def record_agent_tool_name(name: str) -> None:
+    _agent_tool_name_total[name] += 1
 
 
 def record_request(route: str, status: int) -> None:
@@ -137,6 +142,7 @@ def summary() -> Dict:
         "agent_policy_blocks_total": dict(_agent_policy_blocks),
         "policy_blocked_total": dict(_agent_policy_blocks),
         "agent_tool_uses_total": agent_tool_calls,
+        "agent_tool_name_total": dict(_agent_tool_name_total),
         "tool_calls_total": tool_calls,
         "agent_tool_latency_ms": agent_tool_latency,
         "tool_latency_ms": tool_latency,
@@ -159,3 +165,4 @@ def reset() -> None:
     _tool_latency.clear()
     _agent_tool_calls.clear()
     _agent_tool_latency.clear()
+    _agent_tool_name_total.clear()

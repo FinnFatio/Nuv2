@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+# default temperature=0.2; N_CTX/N_GPU_LAYERS/N_THREADS via env (example using Windows setx)
 # setx LLM_MODEL "D:\\modelos\\llama31-8b-instruct\\llama31-8b.Q4_K_M.gguf"
 # setx N_CTX "8192"
 # setx N_GPU_LAYERS "999"
