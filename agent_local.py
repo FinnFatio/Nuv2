@@ -30,6 +30,7 @@ def _ensure_tools() -> None:
         _register_all_tools()
         _TOOLS_READY = True
 
+
 MAX_TOOL_RESULT_CHARS = 1000
 MAX_TOOL_RESULT_TOKENS = 512
 
@@ -100,6 +101,22 @@ def _parse_toolcalls(content: str) -> Tuple[str, List[ToolCall]]:
         data = json.loads(content)
     except Exception:
         data = None
+
+    def _append(name: str, args: Any, tc_id: str) -> bool:
+        name = str(name).strip().lower()
+        if not re.fullmatch(r"[a-z0-9._-]{1,64}", name):
+            return False
+        if not isinstance(args, dict):
+            args = {}
+        else:
+            try:
+                if len(json.dumps(args)) > 2000:
+                    args = {}
+            except Exception:
+                args = {}
+        toolcalls.append({"name": name, "args": args, "id": tc_id})
+        return True
+
     if isinstance(data, dict):
         container: Any | None = None
         if isinstance(data.get("tool_calls"), list):
@@ -112,7 +129,7 @@ def _parse_toolcalls(content: str) -> Tuple[str, List[ToolCall]]:
                     continue
                 if "function" in item:
                     func = item.get("function", {}) or {}
-                    name = str(func.get("name", ""))
+                    name = func.get("name", "")
                     args_raw = func.get("arguments", {})
                     try:
                         args = (
@@ -122,40 +139,69 @@ def _parse_toolcalls(content: str) -> Tuple[str, List[ToolCall]]:
                         )
                     except Exception:
                         args = {}
-                    toolcalls.append(
-                        {"name": name, "args": args, "id": item.get("id", "")}
-                    )
+                    _append(name, args, str(item.get("id", "")))
                 else:
-                    name = str(item.get("name", ""))
-                    args = item.get("args", {})
-                    toolcalls.append(
-                        {"name": name, "args": args, "id": item.get("id", "")}
+                    _append(
+                        item.get("name", ""),
+                        item.get("args", {}),
+                        str(item.get("id", "")),
                     )
             return str(data.get("content", "")).strip(), toolcalls
 
-    def repl(match: re.Match[str]) -> str:
-        inner = match.group(1)
+    def _handle_json(inner: str) -> bool:
         data: Dict[str, Any] | None = None
         try:
             data = json.loads(inner)
         except Exception:
-            fixed = inner.replace("'", '"')
-            fixed = re.sub(r",\s*([}\]])", r"\1", fixed)
             try:
-                data = json.loads(fixed)
+                data = ast.literal_eval(inner)
             except Exception:
-                return ""
-        if isinstance(data, dict) and "name" in data:
-            toolcalls.append(
-                {
-                    "name": data.get("name", ""),
-                    "args": data.get("args", {}),
-                    "id": data.get("id", ""),
-                }
+                return False
+        if isinstance(data, dict):
+            return _append(
+                data.get("name", ""),
+                data.get("args", {}),
+                str(data.get("id", "")),
             )
-        return ""
+        return False
+
+    def repl(match: re.Match[str]) -> str:
+        return "" if _handle_json(match.group(1)) else match.group(0)
 
     cleaned = _TOOLCALL_RE.sub(repl, content)
+
+    if "<toolcall>" in cleaned:
+        if cleaned.count("<toolcall>") == 1:
+            start = cleaned.find("<toolcall>")
+            prefix = cleaned[:start]
+            rest = cleaned[start + len("<toolcall>") :]
+            brace = rest.find("{")
+            if brace != -1:
+                depth = 0
+                in_str = False
+                esc = False
+                pos = brace
+                while pos < len(rest):
+                    ch = rest[pos]
+                    if in_str:
+                        if ch == '"' and not esc:
+                            in_str = False
+                        esc = ch == "\\" and not esc
+                    else:
+                        if ch == '"':
+                            in_str = True
+                        elif ch == "{":
+                            depth += 1
+                        elif ch == "}":
+                            depth -= 1
+                            if depth == 0:
+                                pos += 1
+                                break
+                    pos += 1
+                if depth == 0:
+                    inner = rest[brace:pos]
+                    if _handle_json(inner):
+                        cleaned = prefix + rest[pos:]
     return cleaned.strip(), toolcalls
 
 
@@ -329,7 +375,9 @@ class Agent:
             toolcalls = toolcalls[:remaining]
             messages.append({"role": "assistant", "content": text})
             if not toolcalls:
-                match = re.fullmatch(r"\s*([a-z0-9._-]{1,64})\s*\((.*)\)\s*", text, re.I)
+                match = re.fullmatch(
+                    r"\s*([a-z0-9._-]{1,64})\s*\((.*)\)\s*", text, re.I
+                )
                 if match:
                     name = match.group(1).lower()
                     arg_str = match.group(2)
@@ -337,7 +385,7 @@ class Agent:
                         args = {}
                     else:
                         arg_str = arg_str.strip()
-                        if arg_str.startswith('{'):
+                        if arg_str.startswith("{"):
                             try:
                                 args = json.loads(arg_str)
                             except Exception:
@@ -475,6 +523,14 @@ class Agent:
                     )
                     continue
                 args = tc.get("args", {})
+                if not isinstance(args, dict):
+                    args = {}
+                else:
+                    try:
+                        if len(json.dumps(args)) > 2000:
+                            args = {}
+                    except Exception:
+                        args = {}
                 schema = tool.get("schema") if isinstance(tool, dict) else None
                 if schema:
                     missing = [k for k in schema.get("required", []) if k not in args]
