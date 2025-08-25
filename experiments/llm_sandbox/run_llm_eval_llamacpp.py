@@ -24,6 +24,11 @@ from typing import Any, Dict, List  # noqa: E402
 import requests  # type: ignore[import-untyped]  # noqa: E402
 
 from agent_local import Agent, _parse_toolcalls  # noqa: E402
+from tools import register_all_tools  # noqa: E402
+from registry import REGISTRY  # noqa: E402
+
+register_all_tools()
+print(f"[tools] {len(REGISTRY)} registered; optional deps: pip install -r requirements-optional.txt")
 
 
 STOP = ["</toolcall>", "</s>"]
@@ -48,8 +53,9 @@ _local_llm = None
 PRE = (
     "Você é a Nu. Se o pedido exigir ferramenta, responda APENAS com "
     '<toolcall>{"name":"...","args":{...}}</toolcall>. '
-    "Ferramentas (read-only, LLM-0): system.capture_screen(); system.ocr(path); "
-    "system.info(); fs.list(path?); fs.read(path); web.read(url). "
+    "Ferramentas (read-only, LLM-0): system.capture_screen(); system.ocr(...); "
+    "system.info(); fs.list(...); fs.read(...); archive.list(...); archive.read(...); "
+    "web.read(...); ui.what_under_mouse(). "
     "Quando decidir usar ferramenta, responda APENAS com "
     '<toolcall>{"name":"...","args":{...}}</toolcall> '
     "(nunca texto junto); para URLs use sempre web.read(url); para listar arquivos, "
@@ -63,6 +69,11 @@ _FEW_SHOT = [
     {
         "role": "assistant",
         "content": '<toolcall>{"name":"system.capture_screen","args":{}}</toolcall>',
+    },
+    {"role": "user", "content": "O que está sob o cursor?"},
+    {
+        "role": "assistant",
+        "content": '<toolcall>{"name":"ui.what_under_mouse","args":{}}</toolcall>',
     },
     {"role": "user", "content": "Resumo de https://ex.com"},
     {

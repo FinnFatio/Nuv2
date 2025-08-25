@@ -1,11 +1,6 @@
 fastapi
-mss>=10.1.0
-Pillow>=11.3.0
-pytesseract>=0.3.13
 pytest-cov>=5.0.0
-psutil
 httpx
-pygetwindow  # optional
 uvicorn
 requests
 llama-cpp-python>=0.2.90 # fallback local; wheel padrão é CPU-only

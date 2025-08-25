@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from registry import register_tool
+from registry import register_tool, REGISTRY
 from . import system, fs, archive, web, ui
 
 __all__ = ["register_all_tools"]
@@ -16,6 +16,8 @@ def register_all_tools() -> None:
         rate_limit_per_min=30,
         enabled_in_safe_mode=True,
         func=system.capture_screen,
+        schema={"args": {"type": "object", "properties": {"bounds": {"type": "object"}}},
+                 "returns": {"type": "object", "properties": {"png_base64": {"type": "string"}}}},
     )
     register_tool(
         name="system.ocr",
@@ -26,16 +28,8 @@ def register_all_tools() -> None:
         rate_limit_per_min=30,
         enabled_in_safe_mode=True,
         func=system.ocr,
-    )
-    register_tool(
-        name="system.uia_query",
-        version="1",
-        summary="uia query",
-        safety="read",
-        timeout_ms=5000,
-        rate_limit_per_min=30,
-        enabled_in_safe_mode=True,
-        func=system.uia_query,
+        schema={"args": {"type": "object", "properties": {"bounds": {"type": "object"},}},
+                 "returns": {"type": "object", "properties": {"text": {"type": "string"}}}},
     )
     register_tool(
         name="system.info",
@@ -46,6 +40,7 @@ def register_all_tools() -> None:
         rate_limit_per_min=60,
         enabled_in_safe_mode=True,
         func=system.info,
+        schema={"args": {"type": "object", "properties": {}}, "returns": {"type": "object"}},
     )
     register_tool(
         name="fs.list",
@@ -56,6 +51,8 @@ def register_all_tools() -> None:
         rate_limit_per_min=60,
         enabled_in_safe_mode=True,
         func=fs.list,
+        schema={"args": {"type": "object", "properties": {"path": {"type": "string"}}},
+                 "returns": {"type": "array", "items": {"type": "string"}}},
     )
     register_tool(
         name="fs.read",
@@ -66,6 +63,8 @@ def register_all_tools() -> None:
         rate_limit_per_min=60,
         enabled_in_safe_mode=True,
         func=fs.read,
+        schema={"args": {"type": "object", "properties": {"path": {"type": "string"}}},
+                 "returns": {"type": "string"}},
     )
     register_tool(
         name="archive.list",
@@ -76,6 +75,8 @@ def register_all_tools() -> None:
         rate_limit_per_min=60,
         enabled_in_safe_mode=True,
         func=archive.list,
+        schema={"args": {"type": "object", "properties": {"path": {"type": "string"}}},
+                 "returns": {"type": "array", "items": {"type": "string"}}},
     )
     register_tool(
         name="archive.read",
@@ -86,6 +87,8 @@ def register_all_tools() -> None:
         rate_limit_per_min=60,
         enabled_in_safe_mode=True,
         func=archive.read,
+        schema={"args": {"type": "object", "properties": {"path": {"type": "string"}, "inner_path": {"type": "string"}}},
+                 "returns": {"type": "object", "properties": {"bytes_b64": {"type": "string"}}}},
     )
     register_tool(
         name="web.read",
@@ -96,6 +99,8 @@ def register_all_tools() -> None:
         rate_limit_per_min=30,
         enabled_in_safe_mode=True,
         func=web.read,
+        schema={"args": {"type": "object", "properties": {"url": {"type": "string"}}},
+                 "returns": {"type": "object", "properties": {"text": {"type": "string"}, "url_final": {"type": "string"}}}},
     )
     register_tool(
         name="ui.what_under_mouse",
@@ -115,19 +120,19 @@ def register_all_tools() -> None:
                     "y": {"type": "integer"},
                     "window": {
                         "type": ["object", "null"],
-                        "properties": {
-                            "title": {"type": "string"},
-                            "app": {"type": "string"},
-                        },
+                        "properties": {"title": {"type": "string"}, "app": {"type": "string"}},
                     },
                     "control": {
                         "type": ["object", "null"],
-                        "properties": {
-                            "role": {"type": "string"},
-                            "name": {"type": "string"},
-                        },
+                        "properties": {"role": {"type": "string"}, "name": {"type": "string"}},
                     },
                 },
             },
         },
     )
+    try:
+        import metrics
+
+        metrics.record_gauge("agent_tool_name_total", len(REGISTRY))
+    except Exception:
+        pass
