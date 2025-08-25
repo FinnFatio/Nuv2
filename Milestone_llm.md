@@ -91,6 +91,7 @@ Dependências opcionais (`requirements-optional.txt`): `mss`, `Pillow`, `pytesse
 - `missing_dep` – instale dependência ausente (`pip install -r requirements-optional.txt` ou binário externo)
 - `forbidden_path` – caminho fora do allowlist (use diretórios dentro do repositório)
 - `timeout` – reexecute ou verifique conectividade
+- `LLM endpoint indisponível e fallback local desativado/ausente` – defina `LLM_ENDPOINT` ou instale/configure `llama_cpp`; para smoketests sem `llama_cpp`, exporte `LLM_DISABLE_LOCAL_FALLBACK=1` e utilize um endpoint como `dummy_llm.py` (o aviso "missing llama_cpp" não deve mais aparecer)
 
 > Observação: Ferramentas de **ação** (click/type/open/write) **ficam para LLM‑1**. Se desejar já suportar “criar um arquivo” sem tocar no sistema, habilite **opcionalmente** a tool `doc.ppt_generate` que salva **apenas** em `exports/` (SAFE_MODE on).
 

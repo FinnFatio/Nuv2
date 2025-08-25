@@ -18,6 +18,7 @@ if ROOT not in sys.path:
 import base64  # noqa: E402
 import json  # noqa: E402
 import os  # noqa: E402
+import importlib.util  # noqa: E402
 from pathlib import Path  # noqa: E402
 from typing import Any, Dict, List  # noqa: E402
 
@@ -28,7 +29,16 @@ from tools import register_all_tools  # noqa: E402
 from registry import REGISTRY  # noqa: E402
 
 register_all_tools()
-print(f"[tools] {len(REGISTRY)} registered; optional deps: pip install -r requirements-optional.txt")
+msg = f"[tools] {len(REGISTRY)} registered; optional deps: pip install -r requirements-optional.txt"
+try:
+    import metrics  # type: ignore
+
+    total = metrics.summary().get("gauges", {}).get("agent_tool_name_total")
+    if total is not None:
+        msg += f" (agent_tool_name_total={total})"
+except Exception:
+    pass
+print(msg)
 
 
 STOP = ["</toolcall>", "</s>"]
@@ -44,6 +54,7 @@ def ensure_sample_png(path: str) -> None:
 
 
 _logged = False
+_fallback_logged = False
 
 
 # substitua a função llamacpp_chat por esta versão com fallback local
@@ -114,11 +125,12 @@ def llamacpp_chat(
     temperature: float | None = None,
 ) -> Dict[str, Any]:
     """Chat wrapper com STOP e fallback p/ llama_cpp local quando não há endpoint."""
-    global _local_llm, _logged
+    global _local_llm, _logged, _fallback_logged
     messages = _with_examples(messages)
     messages = _with_preamble(messages)
     endpoint = os.getenv("LLM_ENDPOINT", "").strip() or None
     model = os.getenv("LLM_MODEL", "llama")
+    disable_local = os.getenv("LLM_DISABLE_LOCAL_FALLBACK") == "1"
     if temperature is None:
         temperature = 0.2
 
@@ -141,6 +153,17 @@ def llamacpp_chat(
             return {"text": text, "toolcalls": toolcalls, "usage": usage}
         except requests.ConnectionError:
             print("[llm] endpoint indisponível → usando fallback local llama_cpp")
+
+    if disable_local or importlib.util.find_spec("llama_cpp") is None:
+        global _fallback_logged
+        if not _fallback_logged:
+            print(
+                "[llm] fallback local desabilitado (LLM_DISABLE_LOCAL_FALLBACK=1 ou llama_cpp ausente)"
+            )
+            _fallback_logged = True
+        raise RuntimeError(
+            "LLM endpoint indisponível e fallback local desativado/ausente"
+        )
 
     if _local_llm is None:
         from llama_cpp import Llama  # requer: pip install llama-cpp-python
@@ -184,7 +207,11 @@ def main() -> None:
     agent = Agent(llm=llamacpp_chat, safe_mode=True)  # type: ignore[arg-type]
     results = []
     for p in prompts:
-        output = agent.chat(p)
+        try:
+            output = agent.chat(p)
+        except RuntimeError as e:
+            print(e)
+            return
         status = "ok"
         lowered = output.lower()
         if any(k in lowered for k in ("forbidden", "policy")):

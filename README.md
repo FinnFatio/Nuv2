@@ -28,6 +28,34 @@ python screenshot.py --json --window "janela_que_nao_existe" erro.png
 
 Para detalhes completos de configuração, uso da CLI e API, consulte [docs/usage.md](docs/usage.md).
 
+### Smoketest LLM
+
+1. Inicie o endpoint de teste:
+
+```sh
+python experiments/llm_sandbox/dummy_llm.py
+```
+
+2. Em outro terminal, execute os wrappers com o fallback local desabilitado.
+
+**Bash**
+
+```sh
+export LLM_ENDPOINT=http://127.0.0.1:8000
+export LLM_MODEL=dummy
+export LLM_DISABLE_LOCAL_FALLBACK=1
+python experiments/llm_sandbox/nu_repl.py <<< "Hello"
+```
+
+**PowerShell**
+
+```powershell
+$env:LLM_ENDPOINT="http://127.0.0.1:8000"
+$env:LLM_MODEL="dummy"
+$env:LLM_DISABLE_LOCAL_FALLBACK="1"
+python experiments/llm_sandbox/run_llm_eval_llamacpp.py
+```
+
 <a id="log-config"></a>
 ## Configurações de log
 
@@ -64,6 +92,7 @@ Principais dependências:
 - `psutil` para informações de processos.
 - `fastapi` para o servidor HTTP.
 - `pygetwindow` (opcional) para manipulação de janelas.
+- `llama-cpp-python` (opcional) para fallback local da LLM – CPU: `pip install llama-cpp-python`; AMD ROCm: instale sua build local; NVIDIA/CUDA: wheel específico.
 
 ## Desenvolvimento
 

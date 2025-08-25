@@ -26,6 +26,7 @@ def what_under_mouse() -> Dict[str, Any]:
     window = None
     try:
         import pygetwindow as gw
+
         w = None
         if hasattr(gw, "getWindowsAt"):
             ws = gw.getWindowsAt(x, y)
@@ -35,7 +36,16 @@ def what_under_mouse() -> Dict[str, Any]:
             w = gw.getActiveWindow()
         if w is not None:
             title = getattr(w, "title", "") or ""
-            app = getattr(w, "title", "") or ""
+            app: str | None = None
+            try:
+                import psutil
+                import win32process  # type: ignore[import-not-found]
+
+                if hasattr(w, "_hWnd"):
+                    _, pid = win32process.GetWindowThreadProcessId(int(w._hWnd))
+                    app = psutil.Process(pid).name()
+            except Exception:
+                app = None
             window = {"title": title, "app": app}
     except Exception:
         window = None
@@ -50,7 +60,10 @@ def what_under_mouse() -> Dict[str, Any]:
             control = {"role": role, "name": name}
     except Exception:
         control = None
-    return {"kind": "ok", "result": {"x": x, "y": y, "window": window, "control": control}}
+    return {
+        "kind": "ok",
+        "result": {"x": x, "y": y, "window": window, "control": control},
+    }
 
 
 __all__ = ["what_under_mouse"]
