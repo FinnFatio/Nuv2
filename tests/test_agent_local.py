@@ -1,3 +1,4 @@
+# ruff: noqa: E741
 import agent_local
 import json
 import uuid
@@ -16,7 +17,7 @@ from agent_local import (
 
 
 def test_parse_toolcalls_multiple_and_spaces():
-    text = "Hello<toolcall>{\n \"name\": \"foo\", \"args\": {}}\n</toolcall>world<toolcall>{\"name\":\"bar\"}</toolcall>!"
+    text = 'Hello<toolcall>{\n "name": "foo", "args": {}}\n</toolcall>world<toolcall>{"name":"bar"}</toolcall>!'
     cleaned, tcs = _parse_toolcalls(text)
     assert cleaned == "Helloworld!"
     assert [tc["name"] for tc in tcs] == ["foo", "bar"]
@@ -31,8 +32,8 @@ def test_parse_toolcalls_tolerant_json():
 
 def test_parse_toolcalls_interleaved_with_text_newlines():
     text = (
-        "one <toolcall>{\"name\":\"foo\"}</toolcall> two\n"
-        "<toolcall>{\"name\":\"bar\"}</toolcall> three"
+        'one <toolcall>{"name":"foo"}</toolcall> two\n'
+        '<toolcall>{"name":"bar"}</toolcall> three'
     )
     cleaned, tcs = _parse_toolcalls(text)
     assert cleaned == "one  two\n three"
@@ -96,6 +97,7 @@ def test_agent_unknown_tool_feedback():
     class LLM:
         def __init__(self):
             self.calls = 0
+
         def __call__(self, messages, **kwargs):
             self.calls += 1
             if self.calls == 1:
@@ -130,7 +132,9 @@ def test_remaining_tools_telemetry(monkeypatch):
         agent_local, "dispatch", lambda req, request_id, safe_mode: {"kind": "ok"}
     )
     monkeypatch.setattr(
-        agent_local, "get_tool", lambda name: {"name": name, "enabled_in_safe_mode": True}
+        agent_local,
+        "get_tool",
+        lambda name: {"name": name, "enabled_in_safe_mode": True},
     )
     llm = LLM()
     agent = Agent(llm=llm)
@@ -162,7 +166,11 @@ def test_agent_invalid_args(monkeypatch):
     monkeypatch.setattr(
         agent_local,
         "get_tool",
-        lambda name: {"name": name, "enabled_in_safe_mode": True, "schema": {"required": ["msg"]}},
+        lambda name: {
+            "name": name,
+            "enabled_in_safe_mode": True,
+            "schema": {"required": ["msg"]},
+        },
     )
 
     agent = Agent(llm=llm)
@@ -176,9 +184,13 @@ def test_toolcall_log_includes_context(monkeypatch, capsys):
             return '<toolcall>{"name":"echo"}</toolcall>'
         return "done"
 
-    monkeypatch.setattr(agent_local, "dispatch", lambda req, request_id, safe_mode: {"kind": "ok"})
     monkeypatch.setattr(
-        agent_local, "get_tool", lambda name: {"name": name, "enabled_in_safe_mode": True}
+        agent_local, "dispatch", lambda req, request_id, safe_mode: {"kind": "ok"}
+    )
+    monkeypatch.setattr(
+        agent_local,
+        "get_tool",
+        lambda name: {"name": name, "enabled_in_safe_mode": True},
     )
     logger.setup(enable=True, jsonl=True)
     agent = Agent(llm=llm)
@@ -196,12 +208,11 @@ def test_agent_respects_tool_limit(monkeypatch):
     class LLM:
         def __init__(self):
             self.calls = 0
+
         def __call__(self, messages, **kwargs):
             self.calls += 1
             if self.calls == 1:
-                return "".join(
-                    "<toolcall>{\"name\":\"echo\"}</toolcall>" for _ in range(5)
-                )
+                return "".join('<toolcall>{"name":"echo"}</toolcall>' for _ in range(5))
             return "done"
 
     llm = LLM()
@@ -214,7 +225,9 @@ def test_agent_respects_tool_limit(monkeypatch):
 
     monkeypatch.setattr(agent_local, "dispatch", fake_dispatch)
     monkeypatch.setattr(
-        agent_local, "get_tool", lambda name: {"name": name, "enabled_in_safe_mode": True}
+        agent_local,
+        "get_tool",
+        lambda name: {"name": name, "enabled_in_safe_mode": True},
     )
 
     agent = Agent(llm=llm, max_tools=3)
@@ -226,6 +239,7 @@ def test_llm_tokens_per_second_logged(monkeypatch):
     class FakeClock:
         def __init__(self):
             self.t = 0.0
+
         def __call__(self):
             v = self.t
             self.t += 1.0
@@ -234,8 +248,10 @@ def test_llm_tokens_per_second_logged(monkeypatch):
     class DummyLogger:
         def __init__(self):
             self.logs: List[Dict[str, Any]] = []
+
         def info(self, msg: str) -> None:
             self.logs.append(json.loads(msg))
+
         def warning(self, msg: str) -> None:
             self.logs.append(json.loads(msg))
 
@@ -247,7 +263,9 @@ def test_llm_tokens_per_second_logged(monkeypatch):
 
     agent = Agent(llm=llm, log=log, clock=clock)
     assert agent.chat("hi") == "a b c"
-    entry = next(l for l in log.logs if l.get("event") == "llm_call" and not l.get("final"))
+    entry = next(
+        l for l in log.logs if l.get("event") == "llm_call" and not l.get("final")
+    )
     assert entry["approx_tokens"] == 3
     assert entry["approx_tokens_per_sec"] == 3
 
@@ -256,6 +274,7 @@ def test_circuit_breaker_on_failures(monkeypatch):
     class LLM:
         def __init__(self):
             self.calls = 0
+
         def __call__(self, messages, **kwargs):
             self.calls += 1
             return '<toolcall>{"name":"echo"}</toolcall>'
@@ -263,16 +282,22 @@ def test_circuit_breaker_on_failures(monkeypatch):
     class DummyLogger:
         def __init__(self):
             self.logs: List[Dict[str, Any]] = []
+
         def info(self, msg: str) -> None:
             self.logs.append(json.loads(msg))
+
         def warning(self, msg: str) -> None:
             self.logs.append(json.loads(msg))
 
     log = DummyLogger()
     monkeypatch.setattr(
-        agent_local, "get_tool", lambda name: {"name": name, "enabled_in_safe_mode": True}
+        agent_local,
+        "get_tool",
+        lambda name: {"name": name, "enabled_in_safe_mode": True},
     )
-    monkeypatch.setattr(agent_local, "dispatch", lambda req, request_id, safe_mode: {"kind": "error"})
+    monkeypatch.setattr(
+        agent_local, "dispatch", lambda req, request_id, safe_mode: {"kind": "error"}
+    )
     agent = Agent(llm=LLM(), log=log)
     assert (
         agent.chat("hi")
@@ -286,20 +311,24 @@ def test_llm_headers_api_key(monkeypatch):
 
     def fake_post(url, json=None, headers=None, timeout=None):
         captured.append(headers)
+
         class Resp:
             def raise_for_status(self):
                 pass
+
             def json(self):
                 return {"choices": [{"message": {"content": "hi"}}]}
+
         return Resp()
 
     monkeypatch.setenv("LLM_ENDPOINT", "http://llm")
     monkeypatch.setenv("LLM_MODEL", "gpt")
     monkeypatch.setenv("LLM_API_KEY", "abc")
     monkeypatch.delenv("LLM_AUTH_HEADER", raising=False)
+    monkeypatch.setenv("LLM_DISABLE_LOCAL_FALLBACK", "1")
     monkeypatch.setattr(agent_local.requests, "post", fake_post)
     chat = agent_local._default_llm_backend()
-    assert chat([{ "role": "user", "content": "hi" }]) == "hi"
+    assert chat([{"role": "user", "content": "hi"}]) == "hi"
     assert captured[0]["Authorization"] == "Bearer abc"
 
 
@@ -308,20 +337,24 @@ def test_llm_headers_custom_header(monkeypatch):
 
     def fake_post(url, json=None, headers=None, timeout=None):
         captured.append(headers)
+
         class Resp:
             def raise_for_status(self):
                 pass
+
             def json(self):
                 return {"choices": [{"message": {"content": "hi"}}]}
+
         return Resp()
 
     monkeypatch.setenv("LLM_ENDPOINT", "http://llm")
     monkeypatch.setenv("LLM_MODEL", "gpt")
     monkeypatch.setenv("LLM_AUTH_HEADER", "X-Test: 123")
     monkeypatch.delenv("LLM_API_KEY", raising=False)
+    monkeypatch.setenv("LLM_DISABLE_LOCAL_FALLBACK", "1")
     monkeypatch.setattr(agent_local.requests, "post", fake_post)
     chat = agent_local._default_llm_backend()
-    assert chat([{ "role": "user", "content": "hi" }]) == "hi"
+    assert chat([{"role": "user", "content": "hi"}]) == "hi"
     assert captured[0]["X-Test"] == "123"
 
 
@@ -329,6 +362,7 @@ def test_tool_retry_policy(monkeypatch):
     class LLM:
         def __init__(self):
             self.calls = 0
+
         def __call__(self, messages, **kwargs):
             self.calls += 1
             if self.calls == 1:
@@ -350,7 +384,11 @@ def test_tool_retry_policy(monkeypatch):
     monkeypatch.setattr(
         agent_local,
         "get_tool",
-        lambda name: {"name": name, "enabled_in_safe_mode": True, "schema": {"x-retry": 1}},
+        lambda name: {
+            "name": name,
+            "enabled_in_safe_mode": True,
+            "schema": {"x-retry": 1},
+        },
     )
     monkeypatch.setattr(agent_local.time, "sleep", lambda s: None)
     agent = Agent(llm=LLM())
@@ -362,6 +400,7 @@ def test_safe_mode_blocks_destructive(monkeypatch):
     class LLM:
         def __init__(self):
             self.calls = 0
+
         def __call__(self, messages, **kwargs):
             self.calls += 1
             if self.calls == 1:
@@ -371,9 +410,7 @@ def test_safe_mode_blocks_destructive(monkeypatch):
             assert messages[-1]["role"] == "system"
             assert messages[-1]["content"].startswith("[remaining_tools=")
             assert content["code"] == "forbidden_in_safe_mode"
-            assert (
-                content["hint"] == "peça confirmação ou proponha alternativa"
-            )
+            assert content["hint"] == "peça confirmação ou proponha alternativa"
             return "done"
 
     called = False
@@ -387,7 +424,11 @@ def test_safe_mode_blocks_destructive(monkeypatch):
     monkeypatch.setattr(
         agent_local,
         "get_tool",
-        lambda name: {"name": name, "enabled_in_safe_mode": True, "safety": "destructive"},
+        lambda name: {
+            "name": name,
+            "enabled_in_safe_mode": True,
+            "safety": "destructive",
+        },
     )
     agent = Agent(llm=LLM())
     assert agent.chat("hi") == "done"
@@ -456,9 +497,13 @@ def test_tool_limit_reached_logs_hash(monkeypatch):
             self.logs.append(json.loads(msg))
 
     log = DummyLogger()
-    monkeypatch.setattr(agent_local, "dispatch", lambda req, request_id, safe_mode: {"kind": "ok"})
     monkeypatch.setattr(
-        agent_local, "get_tool", lambda name: {"name": name, "enabled_in_safe_mode": True}
+        agent_local, "dispatch", lambda req, request_id, safe_mode: {"kind": "ok"}
+    )
+    monkeypatch.setattr(
+        agent_local,
+        "get_tool",
+        lambda name: {"name": name, "enabled_in_safe_mode": True},
     )
 
     agent = Agent(llm=LLM(), max_tools=1, log=log)
@@ -490,7 +535,9 @@ def test_tool_result_logs_hash_and_size(monkeypatch):
         agent_local, "dispatch", lambda req, request_id, safe_mode: envelope
     )
     monkeypatch.setattr(
-        agent_local, "get_tool", lambda name: {"name": name, "enabled_in_safe_mode": True}
+        agent_local,
+        "get_tool",
+        lambda name: {"name": name, "enabled_in_safe_mode": True},
     )
 
     class DummyLogger:
@@ -528,7 +575,9 @@ def test_tool_result_preview_respects_max(monkeypatch):
         agent_local, "dispatch", lambda req, request_id, safe_mode: envelope
     )
     monkeypatch.setattr(
-        agent_local, "get_tool", lambda name: {"name": name, "enabled_in_safe_mode": True}
+        agent_local,
+        "get_tool",
+        lambda name: {"name": name, "enabled_in_safe_mode": True},
     )
 
     class DummyLogger:
@@ -577,7 +626,9 @@ def test_tool_reply_whitespace_normalized(monkeypatch):
         agent_local, "dispatch", lambda req, request_id, safe_mode: envelope
     )
     monkeypatch.setattr(
-        agent_local, "get_tool", lambda name: {"name": name, "enabled_in_safe_mode": True}
+        agent_local,
+        "get_tool",
+        lambda name: {"name": name, "enabled_in_safe_mode": True},
     )
     agent = Agent(llm=LLM())
     assert agent.chat("hi") == "done"
@@ -609,7 +660,9 @@ def test_dry_run_skips_dispatch(monkeypatch):
 
     monkeypatch.setattr(agent_local, "dispatch", fake_dispatch)
     monkeypatch.setattr(
-        agent_local, "get_tool", lambda name: {"name": name, "enabled_in_safe_mode": True}
+        agent_local,
+        "get_tool",
+        lambda name: {"name": name, "enabled_in_safe_mode": True},
     )
     agent = Agent(llm=LLM())
     agent.dry_run = True
@@ -652,7 +705,9 @@ def test_e2e_recent_web_read(monkeypatch):
 
     monkeypatch.setattr(agent_local, "dispatch", fake_dispatch)
     monkeypatch.setattr(
-        agent_local, "get_tool", lambda name: {"name": name, "enabled_in_safe_mode": True}
+        agent_local,
+        "get_tool",
+        lambda name: {"name": name, "enabled_in_safe_mode": True},
     )
 
     class LLM:

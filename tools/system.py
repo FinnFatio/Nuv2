@@ -9,6 +9,7 @@ from typing import Any, Dict, Tuple
 
 # helpers ---------------------------------------------------------------
 
+
 def _sanitize(text: str) -> str:
     from agent_local import _redact, _truncate  # lazy import to avoid cycles
 
@@ -51,6 +52,7 @@ def capture(bounds: Tuple[int, int, int, int] | None = None) -> Any:
 
 # tools ----------------------------------------------------------------
 
+
 def capture_screen(bounds: Dict[str, int] | None = None) -> Dict[str, Any]:
     try:
         b = None
@@ -67,7 +69,15 @@ def capture_screen(bounds: Dict[str, int] | None = None) -> Dict[str, Any]:
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     data = base64.b64encode(buf.getvalue()).decode("ascii")
-    return {"kind": "ok", "result": {"png_base64": _sanitize(data)}}
+    png = _sanitize(data)
+    truncated = False
+    if len(png) > 1500:
+        png = png[:1500]
+        truncated = True
+    result: Dict[str, Any] = {"png_base64": png}
+    if truncated:
+        result["truncated"] = True
+    return {"kind": "ok", "result": result}
 
 
 def ocr(bounds: Dict[str, int]) -> Dict[str, Any]:
@@ -127,7 +137,9 @@ def info() -> Dict[str, Any]:
         import torch
 
         if torch.cuda.is_available():
-            data["gpus"] = [torch.cuda.get_device_name(i) for i in range(torch.cuda.device_count())]
+            data["gpus"] = [
+                torch.cuda.get_device_name(i) for i in range(torch.cuda.device_count())
+            ]
     except Exception:
         pass
     try:

@@ -4,3 +4,4 @@ pytesseract>=0.3.13
 screeninfo
 pygetwindow
 psutil
+llama-cpp-python>=0.2.90 # CPU: pip install llama-cpp-python; AMD ROCm: instale sua build local; NVIDIA/CUDA: wheel específico
