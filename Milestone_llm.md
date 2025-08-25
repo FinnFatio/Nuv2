@@ -72,9 +72,25 @@ Os milestones LLM-0…LLM-3 representam a evolução de um **agente local** → 
   **Prioridade:** P1 • **Size:** S
 
 **Metas de qualidade (LLM‑0 DoD global):**
-- ≥ **90%** das perguntas conceituais resolvidas **sem** tool.  
-- ≥ **90%** de consultas “recente” com **1** tool `web.*` e **fonte/data** citadas.  
-- **Nunca** ultrapassar **3** toolcalls por turno.  
+- ≥ **90%** das perguntas conceituais resolvidas **sem** tool.
+- ≥ **90%** de consultas “recente” com **1** tool `web.*` e **fonte/data** citadas.
+- **Nunca** ultrapassar **3** toolcalls por turno.
+
+### Tools read-only disponíveis
+- `system.capture_screen(bounds?)` – screenshot PNG base64 (limite 1 KB)
+- `system.ocr(bounds)` – texto via pytesseract
+- `system.info()` – OS/CPU/RAM/GPU/monitores/safe_mode
+- `fs.list(path)` / `fs.read(path)` – somente dentro do repo ou `experiments/llm_sandbox/assets`
+- `archive.list(path)` / `archive.read(path, inner_path)` – somente `.zip`
+- `web.read(url)` – `timeout=10s`, retorna `text`, `url_final`, `fetched_at`
+- `ui.what_under_mouse()` – `x`, `y`, janela e controle (se disponíveis)
+
+Dependências opcionais (`requirements-optional.txt`): `mss`, `Pillow`, `pytesseract`, `screeninfo`, `pygetwindow`, `psutil`.
+
+### Troubleshooting
+- `missing_dep` – instale dependência ausente (`pip install -r requirements-optional.txt` ou binário externo)
+- `forbidden_path` – caminho fora do allowlist (use diretórios dentro do repositório)
+- `timeout` – reexecute ou verifique conectividade
 
 > Observação: Ferramentas de **ação** (click/type/open/write) **ficam para LLM‑1**. Se desejar já suportar “criar um arquivo” sem tocar no sistema, habilite **opcionalmente** a tool `doc.ppt_generate` que salva **apenas** em `exports/` (SAFE_MODE on).
 

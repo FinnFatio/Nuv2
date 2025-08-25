@@ -22,7 +22,12 @@ def dispatch(
     args = request.get("args", {}) or {}
     tool = get_tool(name)
     if tool is None:
-        return {"kind": "error", "code": "not_found", "error": "tool not found"}
+        return {
+            "kind": "error",
+            "code": "not_found",
+            "message": "tool not found",
+            "hint": "",
+        }
 
     start = time.time()
     if safe_mode and not tool["enabled_in_safe_mode"]:
@@ -30,7 +35,12 @@ def dispatch(
         metrics.record_tool_call(
             name or "", "forbidden", int((time.time() - start) * 1000)
         )
-        return {"kind": "error", "code": "forbidden", "error": "disabled in safe mode"}
+        return {
+            "kind": "error",
+            "code": "forbidden",
+            "message": "disabled in safe mode",
+            "hint": "",
+        }
 
     now = time.time()
     rate = tool["rate_limit_per_min"]
@@ -49,7 +59,8 @@ def dispatch(
             return {
                 "kind": "error",
                 "code": "rate_limit",
-                "error": "rate limit exceeded",
+                "message": "rate limit exceeded",
+                "hint": "",
             }
         bucket["tokens"] -= 1.0
 
@@ -74,12 +85,20 @@ def dispatch(
     elapsed_ms = int((time.time() - start) * 1000)
     if thread.is_alive():
         metrics.record_tool_call(name or "", "timeout", elapsed_ms)
-        return {"kind": "error", "code": "timeout", "elapsed_ms": elapsed_ms}
+        return {
+            "kind": "error",
+            "code": "timeout",
+            "message": "tool timed out",
+            "hint": "",
+            "elapsed_ms": elapsed_ms,
+        }
     if err is not None:
         code, msg = err
         code = code or "internal"
         metrics.record_tool_call(name or "", "error", elapsed_ms)
-        return {"kind": "error", "code": code, "error": msg}
+        return {"kind": "error", "code": code, "message": msg, "hint": ""}
 
     metrics.record_tool_call(name or "", "ok", elapsed_ms)
+    if isinstance(result, dict) and "kind" in result:
+        return result
     return {"kind": "ok", "result": result}

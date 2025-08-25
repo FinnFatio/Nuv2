@@ -19,6 +19,16 @@ from registry import get_tool, violates_policy
 import settings
 import logger as _logger
 import metrics
+from tools import register_all_tools as _register_all_tools
+
+_TOOLS_READY = False
+
+
+def _ensure_tools() -> None:
+    global _TOOLS_READY
+    if not _TOOLS_READY:
+        _register_all_tools()
+        _TOOLS_READY = True
 
 MAX_TOOL_RESULT_CHARS = 1000
 MAX_TOOL_RESULT_TOKENS = 512
@@ -229,6 +239,7 @@ class Agent:
         self.model = model or os.getenv("LLM_MODEL", "")
 
     def chat(self, prompt: str) -> str:
+        _ensure_tools()
         start_turn = self.clock()
         messages: Messages = [{"role": "user", "content": prompt}]
         tool_calls_used = 0

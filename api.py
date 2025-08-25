@@ -288,7 +288,7 @@ def tools_call(body: ToolCallModel, request: Request) -> JSONResponse:
     j = (
         res
         if res["kind"] == "ok"
-        else error_response(res.get("code", "tool_error"), res.get("error", ""))
+        else error_response(res.get("code", "tool_error"), res.get("message", ""))
     )
     r = JSONResponse(j, status_code=http)
     r.headers["X-Request-Id"] = req_id
