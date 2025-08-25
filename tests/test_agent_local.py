@@ -14,6 +14,8 @@ from agent_local import (
     MAX_TOOL_RESULT_CHARS,
     MAX_TOOL_RESULT_TOKENS,
 )
+from registry import register_tool, clear
+from tools import register_all_tools
 
 
 def test_parse_toolcalls_multiple_and_spaces():
@@ -50,6 +52,41 @@ def test_parse_toolcalls_with_id():
     text = '<toolcall>{"name":"foo","id":"123","args":{}}</toolcall>'
     _, tcs = _parse_toolcalls(text)
     assert tcs[0]["id"] == "123"
+
+
+def test_parse_toolcalls_autoclose_simple():
+    text = '<toolcall>{"name":"foo","args":{}}'
+    cleaned, tcs = _parse_toolcalls(text)
+    assert cleaned == ""
+    assert [tc["name"] for tc in tcs] == ["foo"]
+
+
+def test_parse_toolcalls_autoclose_nested_and_junk():
+    text = '<toolcall>{"name":"foo","args":{"a":{"b":1}}}tail'
+    cleaned, tcs = _parse_toolcalls(text)
+    assert cleaned == "tail"
+    assert tcs[0]["args"] == {"a": {"b": 1}}
+
+
+def test_parse_toolcalls_multiple_unclosed_ignored():
+    text = '<toolcall>{"name":"a"}<toolcall>{"name":"b"}'
+    cleaned, tcs = _parse_toolcalls(text)
+    assert cleaned == text
+    assert tcs == []
+
+
+def test_parse_toolcalls_invalid_name_ignored():
+    text = '<toolcall>{"name":"BAD!","args":{}}</toolcall>'
+    cleaned, tcs = _parse_toolcalls(text)
+    assert cleaned == text
+    assert tcs == []
+
+
+def test_parse_toolcalls_arg_size_cap():
+    long_val = "x" * 3000
+    text = f'<toolcall>{{"name":"foo","args":{{"v":"{long_val}"}}}}</toolcall>'
+    _, tcs = _parse_toolcalls(text)
+    assert tcs[0]["args"] == {}
 
 
 def test_parse_toolcalls_alt_format():
@@ -91,6 +128,39 @@ def test_agent_no_toolcall_returns_text():
 
     agent = Agent(llm=llm)
     assert agent.chat("ping") == "pong"
+
+
+def test_agent_name_args_cap():
+    clear()
+
+    captured: Dict[str, Any] = {}
+
+    def dummy(**kwargs):
+        captured["args"] = kwargs
+        return "ok"
+
+    register_tool(
+        name="dummy",
+        version="1",
+        summary="",
+        safety="read",
+        timeout_ms=1000,
+        rate_limit_per_min=10,
+        enabled_in_safe_mode=True,
+        func=dummy,
+    )
+
+    long_val = "x" * 3000
+
+    def llm(messages, **kwargs):
+        return f'dummy({{"v":"{long_val}"}})'
+
+    agent = Agent(llm=llm)
+    agent.chat("hi")
+
+    assert captured["args"] == {}
+    clear()
+    register_all_tools()
 
 
 def test_agent_unknown_tool_feedback():
