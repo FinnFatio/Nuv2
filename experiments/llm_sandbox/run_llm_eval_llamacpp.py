@@ -197,25 +197,27 @@ def main() -> None:
     sample = "experiments/llm_sandbox/assets/sample.png"
     ensure_sample_png(sample)
     prompts = [
-        "Tire um screenshot da tela.",
-        "Mostre a posição atual do cursor e faça um crop dessa área.",
-        "O que está sob o mouse agora?",
-        f"Rode OCR no arquivo {sample}.",
-        "Liste os arquivos do diretório atual.",
-        "Leia https://example.com e resuma.",
+        ("Tire um screenshot da tela.", "ok"),
+        ("Mostre a posição atual do cursor e faça um crop dessa área.", "error"),
+        ("O que está sob o mouse agora?", "error"),
+        (f"Rode OCR no arquivo {sample}.", "error"),
+        ("Liste os arquivos do diretório atual.", "ok"),
+        ("Leia https://example.com e resuma.", "ok"),
     ]
     agent = Agent(llm=llamacpp_chat, safe_mode=True)  # type: ignore[arg-type]
     results = []
-    for p in prompts:
+    for p, expected in prompts:
         try:
             output = agent.chat(p)
         except RuntimeError as e:
             print(e)
             return
-        status = "ok"
         lowered = output.lower()
-        if any(k in lowered for k in ("forbidden", "policy")):
-            status = "expected_error"
+        status = "error" if any(k in lowered for k in ("forbidden", "policy", "error")) else "ok"
+        if expected == "error" and status == "ok":
+            status = "unexpected_ok"
+        elif expected == "ok" and status == "error":
+            status = "unexpected_error"
         results.append({"prompt": p, "output": output, "status": status})
     out_path = Path("llm_eval_results.json")
     out_path.write_text(

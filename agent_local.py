@@ -725,7 +725,7 @@ class Agent:
                     if envelope.get("kind") != "error":
                         break
                     if i + 1 < attempts:
-                        time.sleep(0.2 * (i + 1))
+                        time.sleep(0.2 * (2 ** i))
 
                 messages.append(
                     {

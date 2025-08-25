@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from registry import register_tool, REGISTRY
-from . import system, fs, archive, web, ui
+from . import system, fs, archive, web, ui, image
 
 __all__ = ["register_all_tools"]
 
@@ -22,14 +22,40 @@ def register_all_tools() -> None:
     register_tool(
         name="system.ocr",
         version="1",
-        summary="ocr screen region",
+        summary="ocr image or screen region",
         safety="read",
         timeout_ms=5000,
         rate_limit_per_min=30,
         enabled_in_safe_mode=True,
         func=system.ocr,
-        schema={"args": {"type": "object", "properties": {"bounds": {"type": "object"},}},
-                 "returns": {"type": "object", "properties": {"text": {"type": "string"}}}},
+        schema={
+            "args": {
+                "type": "object",
+                "properties": {
+                    "bounds": {"type": "object"},
+                    "path": {"type": "string"},
+                    "png_base64": {"type": "string"},
+                },
+            },
+            "returns": {
+                "type": "object",
+                "properties": {
+                    "text": {"type": "string"},
+                    "confidence": {"type": "number"},
+                },
+            },
+        },
+    )
+    register_tool(
+        name="system.toolspec",
+        version="1",
+        summary="list available tools and schemas",
+        safety="read",
+        timeout_ms=1000,
+        rate_limit_per_min=10,
+        enabled_in_safe_mode=True,
+        func=system.toolspec,
+        schema={"args": {"type": "object", "properties": {}}, "returns": {"type": "object"}},
     )
     register_tool(
         name="system.info",
@@ -40,7 +66,11 @@ def register_all_tools() -> None:
         rate_limit_per_min=60,
         enabled_in_safe_mode=True,
         func=system.info,
-        schema={"args": {"type": "object", "properties": {}}, "returns": {"type": "object"}},
+        schema={
+            "args": {"type": "object", "properties": {}},
+            "returns": {"type": "object"},
+            "x-retry": 2,
+        },
     )
     register_tool(
         name="fs.list",
@@ -51,8 +81,16 @@ def register_all_tools() -> None:
         rate_limit_per_min=60,
         enabled_in_safe_mode=True,
         func=fs.list,
-        schema={"args": {"type": "object", "properties": {"path": {"type": "string"}}},
-                 "returns": {"type": "array", "items": {"type": "string"}}},
+        schema={
+            "args": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string"},
+                    "recursive": {"type": "boolean"},
+                },
+            },
+            "returns": {"type": "array", "items": {"type": "string"}},
+        },
     )
     register_tool(
         name="fs.read",
@@ -128,6 +166,29 @@ def register_all_tools() -> None:
                     },
                 },
             },
+        },
+    )
+    register_tool(
+        name="image.crop",
+        version="1",
+        summary="crop image region",
+        safety="read",
+        timeout_ms=1000,
+        rate_limit_per_min=30,
+        enabled_in_safe_mode=True,
+        func=image.crop,
+        schema={
+            "args": {
+                "type": "object",
+                "properties": {
+                    "png_base64": {"type": "string"},
+                    "x": {"type": "integer"},
+                    "y": {"type": "integer"},
+                    "w": {"type": "integer"},
+                    "h": {"type": "integer"},
+                },
+            },
+            "returns": {"type": "object", "properties": {"png_base64": {"type": "string"}}},
         },
     )
     try:

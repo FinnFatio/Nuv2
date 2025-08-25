@@ -12,7 +12,7 @@ def _sanitize(text: str) -> str:
     return _truncate(_redact(text))
 
 
-def list(path: str, allow: List[str] | None = None) -> Dict:
+def list(path: str, recursive: bool | None = None, allow: List[str] | None = None) -> Dict:
     p = Path(path)
     allowed = ALLOWED + [Path(a) for a in (allow or [])]
     rp = p.resolve()
@@ -24,7 +24,16 @@ def list(path: str, allow: List[str] | None = None) -> Dict:
             "hint": "",
         }
     try:
-        names = [c.name for c in p.iterdir()]
+        if recursive:
+            names = []
+            for sub in p.rglob("*"):
+                if sub.is_file() or sub.is_dir():
+                    try:
+                        names.append(str(sub.relative_to(p)))
+                    except Exception:
+                        names.append(str(sub))
+        else:
+            names = [c.name for c in p.iterdir()]
         return {"kind": "ok", "result": names}
     except Exception as e:
         return {

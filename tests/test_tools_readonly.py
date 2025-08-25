@@ -7,6 +7,7 @@ import pytest
 
 from tools import register_all_tools, system, fs, archive, web, ui
 from registry import REGISTRY, clear
+import ocr as ocr_module
 
 
 def test_register_all_tools_idempotent():
@@ -38,28 +39,26 @@ def test_ocr_missing_dep(monkeypatch):
     class Img:
         pass
 
-    monkeypatch.setattr(system, "_grab", lambda b: Img())
-    monkeypatch.setitem(
-        sys.modules,
-        "pytesseract",
-        types.SimpleNamespace(image_to_string=lambda img: ""),
-    )
+    monkeypatch.setattr(system, "capture", lambda b: Img())
     monkeypatch.setattr(
-        system.subprocess, "run", lambda *a, **k: (_ for _ in ()).throw(FileNotFoundError())
+        ocr_module,
+        "extract_text",
+        lambda img, region=None: (_ for _ in ()).throw(RuntimeError("tesseract_missing")),
     )
-    res = system.ocr({"left": 0, "top": 0, "right": 1, "bottom": 1})
-    assert res["code"] == "missing_dep"
+    res = system.ocr(bounds={"left": 0, "top": 0, "right": 1, "bottom": 1})
+    assert res["code"] == "tesseract_missing"
 
 
 def test_ocr_ok(monkeypatch):
-    class Img: ...
-    monkeypatch.setattr(system, "_grab", lambda b: Img())
+    class Img:
+        pass
 
-    pyt = types.SimpleNamespace(image_to_string=lambda img: "hi")
-    monkeypatch.setitem(sys.modules, "pytesseract", pyt)
-    monkeypatch.setattr(system.subprocess, "run", lambda *a, **k: None)
-    res = system.ocr({"left": 0, "top": 0, "right": 1, "bottom": 1})
-    assert res["kind"] == "ok" and "text" in res["result"]
+    monkeypatch.setattr(system, "capture", lambda b: Img())
+    monkeypatch.setattr(
+        ocr_module, "extract_text", lambda img, region=None: ("hi", 1.0)
+    )
+    res = system.ocr(bounds={"left": 0, "top": 0, "right": 1, "bottom": 1})
+    assert res["kind"] == "ok" and res["result"]["text"] == "hi"
 
 
 def test_fs_allowlist(tmp_path):
