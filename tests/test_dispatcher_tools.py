@@ -32,6 +32,15 @@ def test_fs_and_archive(tmp_path):
     )
     assert env["kind"] == "ok" and "hello.txt" in env["result"]
 
+    env = dispatch(
+        {
+            "name": "fs.list",
+            "args": {"path": str(tmp_path), "recursive": True, "allow": [str(tmp_path)]},
+        },
+        request_id="2b",
+    )
+    assert env["kind"] == "ok" and "hello.txt" in env["result"]
+
     zpath = tmp_path / "a.zip"
     with zipfile.ZipFile(zpath, "w") as z:
         z.writestr("readme.txt", "zip hi")

@@ -4,6 +4,7 @@ import base64
 import io
 import platform
 import subprocess
+from pathlib import Path
 from typing import Any, Dict, Tuple
 
 
@@ -80,38 +81,85 @@ def capture_screen(bounds: Dict[str, int] | None = None) -> Dict[str, Any]:
     return {"kind": "ok", "result": result}
 
 
-def ocr(bounds: Dict[str, int]) -> Dict[str, Any]:
+def ocr(
+    bounds: Dict[str, int] | None = None,
+    path: str | None = None,
+    png_base64: str | None = None,
+    image: bytes | None = None,
+) -> Dict[str, Any]:
+    """Run OCR on a screen region or image data.
+
+    Accepts one of ``bounds`` (to capture the screen), ``path`` to an image
+    file, ``png_base64`` with the image contents encoded or raw ``image``
+    bytes.  The chosen input is converted to a PIL image before delegating to
+    :func:`ocr.extract_text`.
+    """
+
     try:
-        subprocess.run(["tesseract", "-v"], check=True, capture_output=True)
+        from PIL import Image
     except Exception:
         return {
             "kind": "error",
             "code": "missing_dep",
-            "message": "tesseract not installed",
-            "hint": "install tesseract and pytesseract",
-        }
-    try:
-        import pytesseract
-    except Exception:
-        return {
-            "kind": "error",
-            "code": "missing_dep",
-            "message": "pytesseract not installed",
+            "message": "pillow not installed",
             "hint": "pip install -r requirements-optional.txt",
         }
+
+    img = None
+    if bounds is not None:
+        try:
+            img = capture(
+                (bounds["left"], bounds["top"], bounds["right"], bounds["bottom"])
+            )
+        except RuntimeError:
+            return {
+                "kind": "error",
+                "code": "missing_dep",
+                "message": "mss or pillow not available",
+                "hint": "pip install -r requirements-optional.txt",
+            }
+    else:
+        try:
+            if path is not None:
+                data = Path(path).read_bytes()
+            elif png_base64 is not None:
+                data = base64.b64decode(png_base64)
+            elif image is not None:
+                data = image
+            else:
+                return {
+                    "kind": "error",
+                    "code": "missing_input",
+                    "message": "path, png_base64 or image required",
+                    "hint": "",
+                }
+            img = Image.open(io.BytesIO(data))
+        except Exception as e:
+            return {
+                "kind": "error",
+                "code": "bad_image",
+                "message": str(e),
+                "hint": "",
+            }
+
     try:
-        img = capture(
-            (bounds["left"], bounds["top"], bounds["right"], bounds["bottom"])
-        )
-    except RuntimeError:
+        import ocr as ocr_lib
+
+        text, conf = ocr_lib.extract_text(img)
+    except RuntimeError as e:
+        code = str(e)
+        return {"kind": "error", "code": code, "message": code, "hint": ""}
+    except Exception as e:
         return {
             "kind": "error",
-            "code": "missing_dep",
-            "message": "mss or pillow not available",
-            "hint": "pip install -r requirements-optional.txt",
+            "code": "ocr_failed",
+            "message": str(e),
+            "hint": "",
         }
-    text = pytesseract.image_to_string(img)
-    return {"kind": "ok", "result": {"text": _sanitize(text)}}
+    return {
+        "kind": "ok",
+        "result": {"text": _sanitize(text), "confidence": conf},
+    }
 
 
 def info() -> Dict[str, Any]:
@@ -159,4 +207,20 @@ def info() -> Dict[str, Any]:
     return {"kind": "ok", "result": data}
 
 
-__all__ = ["capture_screen", "ocr", "info"]
+def toolspec() -> Dict[str, Any]:
+    """Return a mapping of registered tools to their schemas."""
+    try:
+        from registry import REGISTRY
+
+        specs = {name: t.get("schema") for name, t in REGISTRY.items()}
+        return {"kind": "ok", "result": specs}
+    except Exception as e:
+        return {
+            "kind": "error",
+            "code": "toolspec_failed",
+            "message": str(e),
+            "hint": "",
+        }
+
+
+__all__ = ["capture_screen", "ocr", "info", "toolspec"]
